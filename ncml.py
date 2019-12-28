@@ -150,17 +150,19 @@ def main(args):
 				except Exception as e:
 					print('{},{},Exception'.format(ncml, variable), file=sys.stderr)
 					print(e, file=sys.stderr)
-
+		
 		d = dict(zip(adapter.ncml_facets(), ncml.split('_')))
 		dest = args.dest.format(**d)
 		os.makedirs(os.path.dirname(dest), exist_ok=True)
-
+	
+		
 		d = adapter.get_fx_dict(d)
 		fxs = df[df.variable.isin(adapter.fx)].loc[(df[d.keys()] == pd.Series(d)).all(axis=1)]
 		fxs.index = fxs.index.droplevel(0)
 
 		# hardcoded time values, only for monthly irregular datasets
-		if (df.loc[ncml].frequency == 'Amon').all():
+		irregular_frequencies = ['Amon', 'mon']
+		if all(np.in1d(df.loc[ncml].frequency, irregular_frequencies)):
 			a_var = df.loc[ncml].index.get_level_values(level='variables')[0]
 			a_version = df.loc[ncml,a_var].index.get_level_values(level='versions')[-1]
 			time_values = get_time_values(df.loc[ncml, a_var, a_version])
