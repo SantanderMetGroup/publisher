@@ -28,8 +28,8 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description='Create a catalog from a list of ncmls.')
 	parser.add_argument('--root', dest='root', type=str, help='Root of NcMLs hierarchy.')
 	parser.add_argument('--name', dest='name', type=str, help='Catalog name.')
-	parser.add_argument('--location', dest='location', type=str, help='DatasetRoot location.')
-	parser.add_argument('--path', dest='path', type=str, help='DatasetRoot path.')
+	parser.add_argument('--location', dest='location', type=str, default='',help='DatasetRoot location.')
+	parser.add_argument('--path', dest='path', type=str, default='', help='DatasetRoot path.')
 	parser.add_argument('--template', dest='template', type=str, help='Template to use.')
 
 	args = parser.parse_args()

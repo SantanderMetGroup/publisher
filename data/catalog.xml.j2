@@ -31,9 +31,7 @@
     <service base="/thredds/uddc/" name="uddc" serviceType="UDDC" />
   </service>
 
-  <datasetRoot location="{{ ncml_location }}" path="{{ name }}" />
-
   {% for ncml in ncmls|sort -%}
-  <dataset name="{{ ncml.split('/')|last|replace('.ncml', '') }}" ID="{{ ncml|replace('.ncml', '') }}" serviceName="virtual" urlPath="{{ name }}/{{ ncml }}" />
+  <dataset name="{{ ncml.split('/')|last|replace('.ncml', '') }}" ID="{{ ncml|replace('.ncml', '') }}" serviceName="virtual" urlPath="{{ path }}/{{ ncml }}" />
   {% endfor %}
 </catalog>
