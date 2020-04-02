@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<catalog name="{{ name }}"
+		xmlns="http://www.unidata.ucar.edu/namespaces/thredds/InvCatalog/v1.0"
+		xmlns:xlink="http://www.w3.org/1999/xlink">
+
+  <datasetRoot path="cordex-esdm/aggregated" location="content/cordex-esdm" />
+  <datasetRoot path="cordex-esdm/files" location="/oceano/gmeteo/WORK/bmedina/CORDEX-ESDM" />
+  {% for catalog in catalogs|sort(attribute='title') %}
+  <catalogRef xlink:title="{{ catalog.title|replace('cordex-esdm_', '') }}" xlink:href="{{ catalog.href }}" name="">
+    <dataSize units="bytes">{{ catalog.size }}</dataSize>
+    <date type="modified">{{ catalog.last_modified }}</date>
+  </catalogRef>
+  {% endfor %}
+</catalog>

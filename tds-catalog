@@ -1,0 +1,171 @@
+#!/bin/bash
+
+usage() {
+	echo "tds-catalog --groupby GROUP_SPEC --prefix PREFIX --dest DEST --name NAME --path PATH --location LOCATION [INVENTORY]" >&2
+	echo "  name, path and location are used in the root catalog"
+	echo "  inventory is a file that contain an absolute path of a nc/ncml file per line," >&2
+	echo "  if inventory is not specified, read from stdin" >&2
+	echo "  prefix is a string that will be removed from each nc/ncml (for TDS urlPath)" >&2
+	echo "" >&2
+	echo "  groupby spec (cmip6): 1-5,7-" >&2
+	echo "  groupby spec (cmip5): 1-5,7-" >&2
+	echo "  groupby spec (cordex): 1-5,7-" >&2
+}
+
+# $1 ncml file
+ncml_size() {
+	sed -n '/attribute name="size"/{s/[^0-9]//g;p}' <"$1"
+}
+
+# $1 catalog file
+catalog_size() {
+	sed -n "/dataSize/{s/[^0-9]//g;p}" <"$1" | awk '{sum+=$0}END{print sum}'
+}
+
+while [[ $# -gt 0 ]]
+do
+	case "$1" in
+	-d | --dest)
+		dest="$2"
+		shift 2
+		;;
+	-g | --groupby)
+		groupby="$2"
+		shift 2
+		;;
+	-h | --help)
+		usage
+		exit 1
+		;;
+	-l | --location)
+		location="$2"
+		shift 2
+		;;
+	-n | --name)
+		root_catalog_name="$2"
+		shift 2
+		;;
+	-p | --path)
+		path="$2"
+		shift 2
+		;;
+	--prefix)
+		# Remove last / only if it's the last character in $2 (python rstrip('/'))
+		prefix="${2/%\//}"
+		shift 2
+		;;
+	*)
+		inventory="$1"
+		break
+		;;
+	esac
+done
+
+if [ -z "$groupby" ] || [ -z "$prefix" ] || [ -z "$dest" ]; then
+	usage
+	exit 1
+fi
+
+if [ ! -z "$inventory" ] && [ ! -f "$inventory" ]; then
+	echo "Inventory file was specified but it does not exist: $inventory" >&2
+	exit 1
+fi
+
+# Loop over ncmls and add them to the corresponding catalog,
+# generating it if needed
+cat "${inventory:-/dev/stdin}" | sort -V | while read ncml
+do
+	up=${ncml/$prefix/}
+	# Remove first / only if it's the first character in $up (python lstrip('/'))
+	urlPath=${up/#\//}
+	ncml_basename=${urlPath##*/}
+	name=${ncml_basename%.ncml}
+	last_modified=$(stat --format='%z' "$ncml")
+	size=$(ncml_size "$ncml")
+
+	facets=$(echo $name | cut -d_ -f${groupby})
+	catalog=${facets//_/\/}
+
+	if [ ! -f "${dest}/${catalog}/catalog.xml" ]; then
+		mkdir -p ${dest}/${catalog}
+		cat >${dest}/${catalog}/catalog.xml <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<catalog name="${catalog//\//_}"
+		xmlns="http://www.unidata.ucar.edu/namespaces/thredds/InvCatalog/v1.0"
+		xmlns:xlink="http://www.w3.org/1999/xlink">
+
+  <service name="all" serviceType="Compound" base="">
+    <service base="/thredds/dodsC/" name="odap" serviceType="OpenDAP"/>
+    <service base="/thredds/dap4/" name="dap4" serviceType="DAP4" />
+    <service base="/thredds/fileServer/" name="http" serviceType="HTTPServer" />
+    <service base="/thredds/wcs/" name="wcs" serviceType="WCS" />
+    <service base="/thredds/wms/" name="wms" serviceType="WMS" />
+    <service base="/thredds/ncss/grid/" name="ncssGrid" serviceType="NetcdfSubset" />
+    <service base="/thredds/ncss/point/" name="ncssPoint" serviceType="NetcdfSubset" />
+    <service base="/thredds/cdmremote/" name="cdmremote" serviceType="CdmRemote" />
+    <service base="/thredds/cdmrfeature/grid/" name="cdmrFeature" serviceType="CdmrFeature" />
+    <service base="/thredds/iso/" name="iso" serviceType="ISO" />
+    <service base="/thredds/ncml/" name="ncml" serviceType="NCML" />
+    <service base="/thredds/uddc/" name="uddc" serviceType="UDDC" />
+  </service>
+
+  <service name="virtual" serviceType="Compound" base="">
+    <service base="/thredds/dodsC/" name="odap" serviceType="OpenDAP"/>
+    <service base="/thredds/dap4/" name="dap4" serviceType="DAP4" />
+    <service base="/thredds/wcs/" name="wcs" serviceType="WCS" />
+    <service base="/thredds/wms/" name="wms" serviceType="WMS" />
+    <service base="/thredds/ncss/grid/" name="ncssGrid" serviceType="NetcdfSubset" />
+    <service base="/thredds/ncss/point/" name="ncssPoint" serviceType="NetcdfSubset" />
+    <service base="/thredds/cdmremote/" name="cdmremote" serviceType="CdmRemote" />
+    <service base="/thredds/cdmrfeature/grid/" name="cdmrFeature" serviceType="CdmrFeature" />
+    <service base="/thredds/iso/" name="iso" serviceType="ISO" />
+    <service base="/thredds/ncml/" name="ncml" serviceType="NCML" />
+    <service base="/thredds/uddc/" name="uddc" serviceType="UDDC" />
+  </service>
+
+</catalog>
+EOF
+	fi
+
+	sed -i '$ i\
+  <dataset name="'$name'"\
+      ID="'"${path}/${urlPath%.ncml}"'"\
+      urlPath="'"${path}/${urlPath}"'">\
+    <metadata inherited="true">\
+      <serviceName>all</serviceName>\
+      <dataSize units="bytes">'"$size"'</dataSize>\
+      <date type="modified">'"$last_modified"'</date>\
+    </metadata>\
+  </dataset>\n' ${dest}/${catalog}/catalog.xml
+done
+
+# Generate root catalog
+root_catalog=${dest}/catalog.xml
+mkdir -p ${dest}
+
+cat > ${root_catalog} <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<catalog name="$root_catalog_name"
+		xmlns="http://www.unidata.ucar.edu/namespaces/thredds/InvCatalog/v1.0"
+		xmlns:xlink="http://www.w3.org/1999/xlink">
+
+  <datasetRoot path="$path" location="$location" />
+
+</catalog>
+EOF
+
+# Insert catalogRef in root catalog
+find ${dest} -mindepth 3 -name catalog.xml -printf '%P\n' | while read catalog
+do
+	facets=${catalog%/*}
+	title=${facets//\//_}
+	size=$(catalog_size ${dest}/${catalog})
+	last_modified=$(stat --format='%z' ${dest}/${catalog})
+
+	# Add <catalogRef>
+	sed -i '$ i\
+  <catalogRef xlink:title="'"$title"'" xlink:href="'$catalog'" name="">\
+    <dataSize units="bytes">'"$size"'</dataSize>\
+    <date type="modified">'"$last_modified"'</date>\
+  </catalogRef>\n' $root_catalog
+done

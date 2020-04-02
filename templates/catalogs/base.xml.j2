@@ -1,11 +1,10 @@
-<catalog xmlns="http://www.unidata.ucar.edu/namespaces/thredds/InvCatalog/v1.0"
-	 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	 xsi:schemaLocation="http://www.unidata.ucar.edu/namespaces/thredds/InvCatalog/v1.0 http://www.unidata.ucar.edu/schemas/thredds/InvCatalog.1.0.6.xsd"
-	 xmlns:xlink="http://www.w3.org/1999/xlink"
-	 name="{{ name }}">
+<?xml version="1.0" encoding="UTF-8"?>
+<catalog name="{{ name }}"
+		xmlns="http://www.unidata.ucar.edu/namespaces/thredds/InvCatalog/v1.0"
+		xmlns:xlink="http://www.w3.org/1999/xlink">
 
-  <service base="" name="all" serviceType="compound">
-    <service base="/thredds/dodsC/" name="odap" serviceType="OpenDAP" />
+  <service name="all" serviceType="Compound" base="">
+    <service base="/thredds/dodsC/" name="odap" serviceType="OpenDAP"/>
     <service base="/thredds/dap4/" name="dap4" serviceType="DAP4" />
     <service base="/thredds/fileServer/" name="http" serviceType="HTTPServer" />
     <service base="/thredds/wcs/" name="wcs" serviceType="WCS" />
@@ -19,9 +18,11 @@
     <service base="/thredds/uddc/" name="uddc" serviceType="UDDC" />
   </service>
 
-  <service base="" name="virtual" serviceType="compound">
-    <service base="/thredds/dodsC/" name="odap" serviceType="OpenDAP" />
+  <service name="virtual" serviceType="Compound" base="">
+    <service base="/thredds/dodsC/" name="odap" serviceType="OpenDAP"/>
     <service base="/thredds/dap4/" name="dap4" serviceType="DAP4" />
+    <service base="/thredds/wcs/" name="wcs" serviceType="WCS" />
+    <service base="/thredds/wms/" name="wms" serviceType="WMS" />
     <service base="/thredds/ncss/grid/" name="ncssGrid" serviceType="NetcdfSubset" />
     <service base="/thredds/ncss/point/" name="ncssPoint" serviceType="NetcdfSubset" />
     <service base="/thredds/cdmremote/" name="cdmremote" serviceType="CdmRemote" />
@@ -31,7 +32,15 @@
     <service base="/thredds/uddc/" name="uddc" serviceType="UDDC" />
   </service>
 
-  {% for ncml in ncmls|sort -%}
-  <dataset name="{{ ncml.split('/')|last|replace('.ncml', '') }}" ID="{{ ncml|replace('.ncml', '') }}" serviceName="virtual" urlPath="{{ path }}/{{ ncml }}" />
+  {% for dataset in datasets %}
+  <dataset name="{{ dataset.name }}"
+           ID="{{ dataset.path  }}/{{ dataset.urlPath }}"
+           urlPath="{{ dataset.path  }}/{{ dataset.urlPath }}">
+    <metadata inherited="true">
+      <serviceName>{{ dataset.service }}</serviceName>
+      <dataSize units="bytes">{{ dataset.size }}</dataSize>
+      <date type="modified">{{ dataset.last_modified }}</date>
+    </metadata>
+  </dataset>
   {% endfor %}
 </catalog>

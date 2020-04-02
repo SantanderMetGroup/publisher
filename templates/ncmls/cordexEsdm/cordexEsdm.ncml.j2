@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<netcdf xmlns="http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2">
+  <explicit/>
+  <attribute name="size" type="int" value="{{ df[('GLOBALS', 'size')].sum() }}" />
+  <attribute name="size_human" value="{{ df[('GLOBALS', 'size')].sum()|filesizeformat }}" />
+  <attribute name="primary_variables" value="{{ ','.join(df[('GLOBALS', 'variable')].sort_values().unique()) }}" />
+  {% if time_values|length == 0 %}
+  <variable name="time" orgName="time">
+    <attribute name="units" value="{{ df.iloc[0][('time', 'units')] }}" />
+    <values start="{{ df.iloc[0][('time', 'value0')] }}" increment="{{ df.iloc[0][('time', 'increment')] }}" />
+  </variable>
+  {% else %}
+  <variable name="time" orgName="time">
+    <attribute name="units" value="{{ df.iloc[0][('time', 'units')] }}" />
+    <values>
+      {{ time_values|join(" ") }}
+    </values>
+  </variable>
+  {% endif %}
+
+  <aggregation type="union">
+  	{% for name,group in df.groupby(('GLOBALS', 'variable')) %}
+    <netcdf>
+      <aggregation type="joinExisting" dimName="time">
+	  {% for index, row in group[['GLOBALS', 'time']].iterrows() %}
+        <netcdf location="{{ row[('GLOBALS', 'localpath')] }}" ncoords="{{ row[('time', 'ncoords')]|int }}" />
+	  {% endfor %}
+      </aggregation>
+    </netcdf>
+  	{% endfor %}
+    {% for fx in fxs %}
+    <netcdf location="{{ fx }}" />
+    {% endfor %}
+  </aggregation>
+</netcdf>
