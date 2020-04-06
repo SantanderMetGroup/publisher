@@ -10,6 +10,7 @@ from ncml.adapter import *
 from ncml.reader import *
 
 from projects.cmip6 import Cmip6NcmlAdapter
+from projects.cordex import CordexNcmlAdapter
 from projects.cordexEsdm import EcearthCordexEsdmNcmlAdapter, InterimCordexEsdmNcmlAdapter
 
 def to_ncml(name, template, **kwargs):

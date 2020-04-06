@@ -43,3 +43,18 @@ class NetcdfMetadataReader(MetadataReader):
 				attrs['time']['increment'] = value1-value0
 
 			return attrs
+
+class EsgfMetadataReader(NetcdfMetadataReader):
+	def read(self, file):
+		attrs = super().read(file)
+		dirname = os.path.dirname(file)
+		attrs['GLOBALS']['version'] = dirname.split('/')[-1]
+
+		# check if time is regular within the file
+		if attrs['GLOBALS']['frequency'] != 'fx':
+			with netCDF4.Dataset(file) as ds:
+				u = np.unique(np.diff(ds.variables['time']))
+				regular = u.size == 1
+				attrs['time']['regular'] = regular
+
+		return attrs

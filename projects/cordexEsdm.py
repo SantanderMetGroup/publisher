@@ -31,14 +31,30 @@ class EcearthCordexEsdmCatalogAdapter(CatalogAdapter):
 
 		return '/'.join(grouper)
 
-class EcearthCordexEsdmNcmlAdapter(NcmlAdapter):
+class CordexEsdmNcmlAdapter(NcmlAdapter):
+	def filter_fx(self, df):
+		return df
+
+	def get_fxs(self, df, facets, values):
+		return pd.DataFrame(columns=df.columns)
+
+	def get_time_values(self, df):
+		return df
+
+	def preprocess(self, df):
+		return df
+
+	def test(self, df, ncml):
+		pass
+
+class EcearthCordexEsdmNcmlAdapter(CordexEsdmNcmlAdapter):
 	def __init__(self):
 		self.reader = EcearthCordexEsdmMetadataReader()
 		self.template = 'cordexEsdm/cordexEsdm.ncml.j2'
 		self.groupby = ['project', 'model', 'run', 'experiment', 'domain']
 		self.name = '{project}_{model}_{run}_{experiment}_{domain}.ncml'
 
-class InterimCordexEsdmNcmlAdapter(NcmlAdapter):
+class InterimCordexEsdmNcmlAdapter(CordexEsdmNcmlAdapter):
 	def __init__(self):
 		self.reader = InterimCordexEsdmMetadataReader()
 		self.template = 'cordexEsdm/cordexEsdm.ncml.j2'

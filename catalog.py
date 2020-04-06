@@ -11,6 +11,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape, Template
 
 from catalog.adapter import *
 from projects.cmip6 import Cmip6CatalogAdapter
+from projects.cordex import CordexCatalogAdapter
 from projects.cordexEsdm import InterimCordexEsdmCatalogAdapter, EcearthCordexEsdmCatalogAdapter
 
 def ncml_size(ncml):
@@ -104,20 +105,20 @@ def generate_tree(args):
 	# generate catalogs
 	for catalog in catalogs:
 		catalog_name = '_'.join([args.name, catalog.replace('/', '_')]) if args.name else catalog.replace('/', '_')
-		generate(os.path.join(args.dest, catalog, 'catalog.xml'), catalog_name, catalogs[catalog], args.template)
+		generate(os.path.join(args.dest, catalog, 'catalog.xml'), catalog_name, catalogs[catalog], adapter.template)
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description='Create a catalog from a list of ncmls.')
 
 	# used in tree generation and root catalog
 	parser.add_argument('--name', dest='name', type=str, help='Name for root catalog or string to prepend for tree catalogs')
+	parser.add_argument('--dest', dest='dest', type=str, help='Destination directory.')
 
 	# tree catalog generation
-	parser.add_argument('--dest', dest='dest', type=str, help='Destination directory.')
-	parser.add_argument('--template', dest='template', default='base.xml.j2', type=str, help='Template to use.')
 	parser.add_argument('--adapter', dest='adapter', default='Adapter', type=str, help='Adapter class.')
 	# root catalog generation
 	parser.add_argument('--root', dest='root', type=str, default=None, help='Generate root catalog')
+	parser.add_argument('--template', dest='template', type=str, help='Template to use.')
 
 	args = parser.parse_args()
 	if args.root:
