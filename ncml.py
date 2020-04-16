@@ -25,9 +25,12 @@ def to_ncml(name, template, **kwargs):
 
 def get_data(reader, files):
 	for f in files:
-		metadata = reader.read(f)
-		# https://stackoverflow.com/questions/24988131/nested-dictionary-to-multiindex-dataframe-where-dictionary-keys-are-column-label
-		yield {(outerKey, innerKey): value for outerKey, innerDict in metadata.items() for innerKey, value in innerDict.items()}
+		try:
+			metadata = reader.read(f)
+			# https://stackoverflow.com/questions/24988131/nested-dictionary-to-multiindex-dataframe-where-dictionary-keys-are-column-label
+			yield {(outerKey, innerKey): value for outerKey, innerDict in metadata.items() for innerKey, value in innerDict.items()}
+		except:
+			continue
 
 def main(args):
 	if args.adapter is None:
@@ -37,18 +40,18 @@ def main(args):
 
 	files = sys.stdin.read().splitlines()
 	df = pd.DataFrame(get_data(adapter.reader, files))
+	# If df is empty: TypeError: Cannot infer number of levels from empty list
 	df.columns = pd.MultiIndex.from_tuples(df.columns)
 
-	time_variables = adapter.filter_fx(df)
+	preprocessed = adapter.preprocess(df)
 	groupby_spec = adapter.groupby
 	grouper = list(pd.MultiIndex.from_product([['GLOBALS'], groupby_spec]))
 
 	# Each loop iteration generates a NcML
-	for n,g in time_variables.groupby(grouper):
+	for n,g in adapter.filter_fx(preprocessed).groupby(grouper):
 		# Generate NcML template variables
-		preprocessed = adapter.preprocess(g)
 		fxs = adapter.get_fxs(df, groupby_spec, n)
-		time_values = adapter.get_time_values(preprocessed)
+		time_values = adapter.get_time_values(g)
 
 		# Interpolate NcML destination
 		d = dict(zip(groupby_spec, n))
@@ -56,11 +59,11 @@ def main(args):
 		dest = os.path.join(args.dest, name)
 
 		# Quality tests
-		adapter.test(preprocessed, dest)
+		adapter.test(g, dest)
 
 		# Generate NcML
 		os.makedirs(os.path.dirname(dest), exist_ok=True)
-		params = {'df': preprocessed, 'fxs': fxs, 'time_values': time_values}
+		params = {'df': g, 'fxs': fxs, 'time_values': time_values}
 		to_ncml(dest, adapter.template, **params)
 
 if __name__ == '__main__':

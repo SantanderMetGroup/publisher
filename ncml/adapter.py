@@ -49,7 +49,7 @@ class EsgfNcmlAdapter(Adapter):
 
 		for _, group in df.groupby(('GLOBALS', 'variable_id')):
 			nversion = pd.Series(group[('GLOBALS', 'version')].str.replace('[a-zA-Z]', ''), dtype="int")
-			group[('GLOBALS', 'version')] = nversion
+			group.loc[:, ('GLOBALS', 'version')] = nversion
 			latests.append(group.nlargest(1, ('GLOBALS', 'version'), keep='all'))
 
 		return pd.concat(latests)

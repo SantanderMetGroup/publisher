@@ -34,22 +34,20 @@ def catalog_size(catalog):
 
 def generate_root(root, root_name, template):
 	refs = []
-	fpath = os.path.abspath(root)
-	dirname = os.path.dirname(fpath)
 	namespaces = {'unidata': 'http://www.unidata.ucar.edu/namespaces/thredds/InvCatalog/v1.0'}
 	for catalog in sys.stdin.read().splitlines():
 		tree = etree.parse(catalog)
 		name = tree.xpath('/unidata:catalog/@name', namespaces=namespaces)[0]
-		href = os.path.abspath(catalog).replace(dirname, '').lstrip('/')
 		refs.append({
+            'path': os.path.abspath(catalog),
 			'title': name,
-			'href': href,
 			'size': catalog_size(catalog),
 			'last_modified': datetime.fromtimestamp(os.stat(catalog).st_mtime)
 		})
 
 	templates = os.path.join(os.path.dirname(__file__), 'templates/catalogs')
 	env = Environment(loader=FileSystemLoader(templates), autoescape=select_autoescape(['xml']))
+	env.filters['regex_replace'] = lambda s, find, replace: re.sub(find, replace, s)
 	template = env.get_template(template)
 
 	with open(root, 'w+') as fh:
@@ -78,6 +76,7 @@ def generate_tree(args):
 	adapter = globals()[args.adapter]()
 
 	for f in sys.stdin.read().splitlines():
+		fpath = os.path.abspath(f)
 		basename = os.path.basename(f)
 		name = os.path.splitext(basename)[0]
 		ext = os.path.splitext(basename)[1]
@@ -94,7 +93,7 @@ def generate_tree(args):
 		# add dataset to corresponding catalog
 		group = adapter.group(f)
 		catalogs[group].append({
-			'file': f,
+			'file': fpath,
 			'name': name,
 			'last_modified': last_modified,
 			'size': size,
