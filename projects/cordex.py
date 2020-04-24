@@ -44,3 +44,26 @@ class CordexNcmlAdapter(EsgfNcmlAdapter):
 
 		self.fxs = ['areacella', 'areacellr', 'orog', 'sftlf', 'sftgif', 'mrsofc', 'rootd', 'zfull']
 		self.fxs_facets = ['project_id', 'product', 'CORDEX_domain', 'institution_id', 'driving_model_id', 'experiment_id', 'model_id', 'rcm_version_id']
+
+	def preprocess(self, df):
+		preprocessed = super().preprocess(df)
+
+		# Add institute_id to RCMModelName (institute_id-model_id)
+		for r in preprocessed.index:
+			if preprocessed.loc[r, ('GLOBALS', 'institute_id')] not in preprocessed.loc[r, ('GLOBALS', 'model_id')]:
+				preprocessed.loc[r, ('GLOBALS', 'model_id')] = \
+				'-'.join(preprocessed.loc[r, ('GLOBALS', 'institute_id')], preprocessed.loc[r, ('GLOBALS', 'model_id')])
+
+		return preprocessed
+
+	def get_latest_versions(self, df):
+		latests = []
+
+		how_to_group = self.groupby + ['variable_id']
+		grouper = list(pd.MultiIndex.from_product([['GLOBALS'], how_to_group]))
+		for _, group in df.groupby(grouper):
+			nversion = pd.Series(group[('GLOBALS', 'version')].str.replace('[a-zA-Z]', ''), dtype="int")
+			group.loc[:, ('GLOBALS', 'version')] = nversion
+			latests.append(group.nlargest(1, ('GLOBALS', 'version'), keep='all'))
+
+		return pd.concat(latests)

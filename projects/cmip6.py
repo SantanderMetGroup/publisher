@@ -23,8 +23,6 @@ class Cmip6CatalogAdapter(CatalogAdapter):
 		return '/'.join(grouper)
 
 class Cmip6MetadataReader(EsgfMetadataReader):
-	#drs = ['mip_era', 'activity_id','source_id' ,'institution_id' ,'experiment_id' ,'variant_label' ,'grid_label', 'realm', 'table_id', 'frequency']
-
 	def read(self, file):
 		attrs = super().read(file)
 		return attrs
