@@ -74,10 +74,10 @@ class EsgfNcmlAdapter(Adapter):
 		preprocessed.sort_values(by=[('GLOBALS', 'variable_id'), ('GLOBALS', 'localpath')], inplace=True)
 		preprocessed.reset_index(inplace=True)
 		# Add institute_id to RCMModelName (institute_id-model_id)
-        for r in preprocessed.index:
-            if preprocessed.loc[r, ('GLOBALS', 'institute_id')] not in preprocessed.loc[r, ('GLOBALS', 'model_id')]:
-                preprocessed.loc[r, ('GLOBALS', 'model_id')] = \
-                '-'.join(preprocessed.loc[r, ('GLOBALS', 'institute_id')], preprocessed.loc[r, ('GLOBALS', 'model_id')])
+		for r in preprocessed.index:
+			if preprocessed.loc[r, ('GLOBALS', 'institute_id')] not in preprocessed.loc[r, ('GLOBALS', 'model_id')]:
+				preprocessed.loc[r, ('GLOBALS', 'model_id')] = \
+				'-'.join(preprocessed.loc[r, ('GLOBALS', 'institute_id')], preprocessed.loc[r, ('GLOBALS', 'model_id')])
 
 		return preprocessed
 
