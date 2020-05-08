@@ -29,9 +29,10 @@ class Adapter():
 		raise NotImplementedError
 
 class EsgfNcmlAdapter(Adapter):
+	def get_latest_versions(self, df):
+		raise NotImplementedError
+
 	def filter_fx(self, df):
-		# Clean whitespaces from global attributes
-		df['GLOBALS'] = df['GLOBALS'].applymap(lambda x: x.strip() if isinstance(x, str) else x)
 		return df[~df[('GLOBALS', 'variable_id')].isin(self.fxs)]
 
 	def get_fxs(self, df, facets, values):
@@ -43,16 +44,6 @@ class EsgfNcmlAdapter(Adapter):
 			return pd.DataFrame(columns=df.columns)
 		else:
 			return self.get_latest_versions(fxs)
-
-	def get_latest_versions(self, df):
-		latests = []
-
-		for _, group in df.groupby(('GLOBALS', 'variable_id')):
-			nversion = pd.Series(group[('GLOBALS', 'version')].str.replace('[a-zA-Z]', ''), dtype="int")
-			group.loc[:, ('GLOBALS', 'version')] = nversion
-			latests.append(group.nlargest(1, ('GLOBALS', 'version'), keep='all'))
-
-		return pd.concat(latests)
 
 	def get_time_values(self, df):
 		if (df[('GLOBALS', 'frequency')] != 'mon').all():

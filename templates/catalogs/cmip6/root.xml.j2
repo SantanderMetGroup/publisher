@@ -4,7 +4,7 @@
 		xmlns:xlink="http://www.w3.org/1999/xlink">
 
   {% for catalog in catalogs|sort(attribute='title') %}
-  <catalogRef xlink:title="{{ catalog.title }}" xlink:href="{{ catalog.path|regex_replace('.*content/thredds/cmip6/' , '') }}" name="">
+  <catalogRef xlink:title="{{ catalog.title }}" xlink:href="{{ catalog.file|regex_replace('.*content/thredds/cmip6/' , '') }}" name="">
     <dataSize units="bytes">{{ catalog.size }}</dataSize>
     <date type="modified">{{ catalog.last_modified }}</date>
   </catalogRef>

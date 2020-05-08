@@ -2,16 +2,14 @@ import os, sys
 import re
 import pandas as pd
 import netCDF4
-from datetime import datetime
 
 from ncml.adapter import EsgfNcmlAdapter
 from ncml.reader import EsgfMetadataReader
-from catalog.adapter import Adapter as CatalogAdapter
+from catalog.adapter import BaseAdapter as CatalogAdapter
 
 class Cmip6CatalogAdapter(CatalogAdapter):
 	def __init__(self):
 		self.template = 'cmip6/cmip6-noextension.xml.j2'
-		#self.template = 'cmip6/cmip6.xml.j2'
 		self.rtemplate = 'cmip6/root.xml.j2'
 
 	def group(self, file):
@@ -22,9 +20,10 @@ class Cmip6CatalogAdapter(CatalogAdapter):
 
 		return '/'.join(grouper)
 
-class Cmip6MetadataReader(EsgfMetadataReader):
-	#drs = ['mip_era', 'activity_id','source_id' ,'institution_id' ,'experiment_id' ,'variant_label' ,'grid_label', 'realm', 'table_id', 'frequency']
+	def process_dataset(self, dataset):
+		return super().process_ncml(dataset)
 
+class Cmip6MetadataReader(EsgfMetadataReader):
 	def read(self, file):
 		attrs = super().read(file)
 		return attrs
@@ -51,3 +50,15 @@ class Cmip6NcmlAdapter(EsgfNcmlAdapter):
 		preprocessed.loc[:, i] = preprocessed.loc[:, i].str.replace('ScenarioMIP AerChemMIP', 'ScenarioMIP')
 
 		return preprocessed
+
+	def get_latest_versions(self, df):
+		latests = []
+
+		how_to_group = self.groupby + ['variable_id']
+		grouper = list(pd.MultiIndex.from_product([['GLOBALS'], how_to_group]))
+		for _, group in df.groupby(grouper):
+			nversion = pd.Series(group[('GLOBALS', 'version')].str.replace('[a-zA-Z]', ''), dtype="int")
+			group.loc[:, ('GLOBALS', 'version')] = nversion
+			latests.append(group.nlargest(1, ('GLOBALS', 'version'), keep='all'))
+
+		return pd.concat(latests)

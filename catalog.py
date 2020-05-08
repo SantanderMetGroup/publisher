@@ -5,7 +5,6 @@ import argparse
 import re
 from datetime import datetime
 
-from lxml import etree
 from collections import defaultdict
 from jinja2 import Environment, FileSystemLoader, select_autoescape, Template
 
@@ -14,36 +13,11 @@ from projects.cmip6 import Cmip6CatalogAdapter
 from projects.cordex import CordexCatalogAdapter
 from projects.cordexEsdm import InterimCordexEsdmCatalogAdapter, EcearthCordexEsdmCatalogAdapter
 
-def ncml_size(ncml):
-	namespaces = {'unidata': 'http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2'}
-	tree = etree.parse(ncml)
-	size = tree.xpath('/unidata:netcdf/unidata:attribute[@name="size"]', namespaces=namespaces)[0]
-
-	return int(size.attrib['value'])
-
-def catalog_size(catalog):
-	namespaces = {'unidata': 'http://www.unidata.ucar.edu/namespaces/thredds/InvCatalog/v1.0'}
-	tree = etree.parse(catalog)
-	sizes = tree.xpath('//unidata:dataSize', namespaces=namespaces)
-
-	total_size = 0
-	for s in sizes:
-		total_size += int(s.text)
-
-	return total_size
-
-def generate_root(root, root_name, template):
+def generate_root(root, root_name, template, adapter):
 	refs = []
-	namespaces = {'unidata': 'http://www.unidata.ucar.edu/namespaces/thredds/InvCatalog/v1.0'}
 	for catalog in sys.stdin.read().splitlines():
-		tree = etree.parse(catalog)
-		name = tree.xpath('/unidata:catalog/@name', namespaces=namespaces)[0]
-		refs.append({
-            'path': os.path.abspath(catalog),
-			'title': name,
-			'size': catalog_size(catalog),
-			'last_modified': datetime.fromtimestamp(os.stat(catalog).st_mtime)
-		})
+		fpath = os.path.abspath(catalog)
+		refs.append(adapter.process_catalog(fpath))
 
 	templates = os.path.join(os.path.dirname(__file__), 'templates/catalogs')
 	env = Environment(loader=FileSystemLoader(templates), autoescape=select_autoescape(['xml']))
@@ -71,40 +45,20 @@ def generate(catalog, name, datasets, template):
 	print(catalog)
 
 
-def generate_tree(args):
+def generate_tree(name, dest, adapter):
 	catalogs = defaultdict(list)
-	adapter = globals()[args.adapter]()
 
 	for f in sys.stdin.read().splitlines():
-		fpath = os.path.abspath(f)
-		basename = os.path.basename(f)
-		name = os.path.splitext(basename)[0]
-		ext = os.path.splitext(basename)[1]
-		last_modified = datetime.fromtimestamp(os.stat(f).st_mtime)
-		facets = name.split('_')
-
-		if ext == ".ncml":
-			size = ncml_size(f)
-			service = "virtual"
-		else:
-			size = os.stat(f).st_size
-			service = "all"
+		dataset = adapter.process_dataset(f)
 
 		# add dataset to corresponding catalog
 		group = adapter.group(f)
-		catalogs[group].append({
-			'file': fpath,
-			'name': name,
-			'last_modified': last_modified,
-			'size': size,
-			'service': service,
-			'ext': ext
-		})
+		catalogs[group].append(dataset)
 
 	# generate catalogs
 	for catalog in catalogs:
-		catalog_name = '_'.join([args.name, catalog.replace('/', '_')]) if args.name else catalog.replace('/', '_')
-		generate(os.path.join(args.dest, catalog, 'catalog.xml'), catalog_name, catalogs[catalog], adapter.template)
+		catalog_name = '_'.join([name, catalog.replace('/', '_')]) if name else catalog.replace('/', '_')
+		generate(os.path.join(dest, catalog, 'catalog.xml'), catalog_name, catalogs[catalog], adapter.template)
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description='Create a catalog from a list of ncmls.')
@@ -112,15 +66,14 @@ if __name__ == '__main__':
 	# used in tree generation and root catalog
 	parser.add_argument('--name', dest='name', type=str, help='Name for root catalog or string to prepend for tree catalogs')
 	parser.add_argument('--dest', dest='dest', type=str, help='Destination directory.')
-
-	# tree catalog generation
-	parser.add_argument('--adapter', dest='adapter', default='Adapter', type=str, help='Adapter class.')
+	parser.add_argument('--adapter', dest='adapter', type=str, help='Adapter class.')
 	# root catalog generation
 	parser.add_argument('--root', dest='root', type=str, default=None, help='Generate root catalog')
 	parser.add_argument('--template', dest='template', type=str, help='Template to use.')
 
 	args = parser.parse_args()
+	adapter = globals()[args.adapter]()
 	if args.root:
-		generate_root(args.root, args.name, args.template)
+		generate_root(args.root, args.name, args.template, adapter)
 	else:
-		generate_tree(args)
+		generate_tree(args.name, args.dest, adapter)

@@ -1,11 +1,16 @@
 # https://gitlab.com/scds/tds-content/-/issues/4
 
 import os
+import pandas as pd
 from ncml.reader import NetcdfMetadataReader
 from ncml.adapter import Adapter as NcmlAdapter
-from catalog.adapter import Adapter as CatalogAdapter
+from catalog.adapter import BaseAdapter as CatalogAdapter
 
 class InterimCordexEsdmCatalogAdapter(CatalogAdapter):
+	def __init__(self):
+		self.template = 'cordexEsdm/cordexEsdm.xml.j2'
+		self.rtemplate = 'cordexEsdm/root.xml.j2'
+
 	def group(self, file):
 		basename = os.path.basename(file)
 		name, ext = os.path.splitext(basename)
@@ -19,6 +24,10 @@ class InterimCordexEsdmCatalogAdapter(CatalogAdapter):
 		return '/'.join(grouper)
 
 class EcearthCordexEsdmCatalogAdapter(CatalogAdapter):
+	def __init__(self):
+		self.template = 'cordexEsdm/cordexEsdm.xml.j2'
+		self.rtemplate = 'cordexEsdm/root.xml.j2'
+
 	def group(self, file):
 		basename = os.path.basename(file)
 		name, ext = os.path.splitext(basename)

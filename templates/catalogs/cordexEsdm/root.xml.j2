@@ -6,7 +6,7 @@
   <datasetRoot path="cordex-esdm/aggregated" location="content/cordex-esdm" />
   <datasetRoot path="cordex-esdm/files" location="/oceano/gmeteo/WORK/bmedina/CORDEX-ESDM" />
   {% for catalog in catalogs|sort(attribute='title') %}
-  <catalogRef xlink:title="{{ catalog.title|replace('cordex-esdm_', '') }}" xlink:href="{{ catalog.href }}" name="">
+  <catalogRef xlink:title="{{ catalog.title|replace('cordex-esdm_', '') }}" xlink:href="{{ catalog.file|regex_replace('.*cordex-esdm/', '') }}" name="">
     <dataSize units="bytes">{{ catalog.size }}</dataSize>
     <date type="modified">{{ catalog.last_modified }}</date>
   </catalogRef>
