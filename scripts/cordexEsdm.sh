@@ -8,11 +8,13 @@ interim="/oceano/gmeteo/WORK/bmedina/CORDEX-ESDM/ERA-Interim"
 
 # Updating this value requires update cordexEsdm.xml.j2 ncml_prefix variable
 ncmls="/home/zequi/tds-content/public/cordex-esdm"
-#ncmls="jorge-ncmls"
 
 catalogs="/home/zequi/tds-content/cordex-esdm"
-#catalogs="jorge-catalogs"
 catalog_name="cordex-esdm"
+
+# Testing values
+#ncmls=~/tmp/cordexEsdm/content/thredds/public/cordex-esdm
+#catalogs=~/tmp/cordexEsdm/content/thredds/cordex-esdm
 
 # ecearth ncml
 find "$ecearth_r12i1p1" -type f -not -path '*/.*' | \
@@ -32,4 +34,4 @@ find "$ncmls" "$interim" -not -path '*/.*' -type f | grep Interim | \
 
 # root catalog
 find "$catalogs"/{EC-EARTH,ERA-Interim-ESD} -type f | \
-  python catalog.py --root "$catalogs"/catalog.xml --name "$catalog_name" --template cordexEsdm/root.xml.j2
+  python catalog.py --adapter BaseAdapter --root "$catalogs"/catalog.xml --name "$catalog_name" --template cordexEsdm/root.xml.j2

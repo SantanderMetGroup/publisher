@@ -33,8 +33,6 @@ class EsgfNcmlAdapter(Adapter):
 		raise NotImplementedError
 
 	def filter_fx(self, df):
-		# Clean whitespaces from global attributes
-		df['GLOBALS'] = df['GLOBALS'].applymap(lambda x: x.strip() if isinstance(x, str) else x)
 		return df[~df[('GLOBALS', 'variable_id')].isin(self.fxs)]
 
 	def get_fxs(self, df, facets, values):

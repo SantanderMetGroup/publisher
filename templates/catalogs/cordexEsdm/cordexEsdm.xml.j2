@@ -31,12 +31,11 @@
     <service base="/thredds/ncml/" name="ncml" serviceType="NCML" />
     <service base="/thredds/uddc/" name="uddc" serviceType="UDDC" />
   </service>
-  {% set ncml_prefix="/home/zequi/tds-content/public/cordex-esdm/" %}
   {% set nc_prefix="/oceano/gmeteo/WORK/bmedina/CORDEX-ESDM/" %}
   {% for dataset in datasets|select("isncml") %}
   <dataset name="{{ dataset.name }}"
-           ID="cordex-esdm/aggregated/{{ dataset.file|replace(ncml_prefix, '') }}"
-           urlPath="cordex-esdm/aggregated/{{ dataset.file|replace(ncml_prefix, '') }}">
+           ID="cordex-esdm/aggregated/{{ dataset.file|regex_replace('.*public/cordex-esdm/', 'cordex-esdm') }}"
+           urlPath="cordex-esdm/aggregated/{{ dataset.file|regex_replace('.*public/cordex-esdm/', 'cordex-esdm') }}">
     <metadata inherited="true">
       <serviceName>{{ dataset.service }}</serviceName>
       <dataSize units="bytes">{{ dataset.size }}</dataSize>

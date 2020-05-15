@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <netcdf xmlns="http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2">
+  <attribute name="primary_variables" value="{{ ','.join(df[('GLOBALS', 'variable_id')].unique()) }}"/>
   <attribute name="size" type="int" value="{{ df[('GLOBALS', 'size')].sum() }}" />
   <attribute name="size_human" value="{{ df[('GLOBALS', 'size')].sum()|filesizeformat }}" />
+
+  <remove name="tracking_id" type="attribute" />
+  <remove name="variable_id" type="attribute" />
+  <remove name="version" type="attribute" />
 
   {% if time_values|length == 0 %}
   <variable name="time" orgName="time">

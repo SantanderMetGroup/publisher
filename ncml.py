@@ -13,6 +13,9 @@ from projects.cmip6 import Cmip6NcmlAdapter
 from projects.cordex import CordexNcmlAdapter
 from projects.cordexEsdm import EcearthCordexEsdmNcmlAdapter, InterimCordexEsdmNcmlAdapter
 
+# need to debug this
+pd.options.mode.chained_assignment = None
+
 def to_ncml(name, template, **kwargs):
 	templates = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'templates/ncmls')
 	env = Environment(loader=FileSystemLoader(templates), autoescape=select_autoescape(['xml']))
@@ -29,8 +32,8 @@ def get_data(reader, files):
 			metadata = reader.read(f)
 			# https://stackoverflow.com/questions/24988131/nested-dictionary-to-multiindex-dataframe-where-dictionary-keys-are-column-label
 			yield {(outerKey, innerKey): value for outerKey, innerDict in metadata.items() for innerKey, value in innerDict.items()}
-		except:
-			continue
+		except Exception as e:
+			print('{},MetadataReadException,{}'.format(f, e), file=sys.stderr)
 
 def main(args):
 	if args.adapter is None:
@@ -39,8 +42,11 @@ def main(args):
 		adapter = globals()[args.adapter]()
 
 	files = sys.stdin.read().splitlines()
+	if len(files) == 0:
+		sys.exit(0)
+
 	df = pd.DataFrame(get_data(adapter.reader, files))
-	# If df is empty: TypeError: Cannot infer number of levels from empty list
+	# If df is empty: TypeError: Cannot infer number of levels from empty list (see above if test)
 	df.columns = pd.MultiIndex.from_tuples(df.columns)
 
 	preprocessed = adapter.preprocess(df)
