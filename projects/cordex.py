@@ -36,7 +36,7 @@ class CordexNcmlAdapter(EsgfNcmlAdapter):
 		self.reader = CordexMetadataReader()
 
 		self.directory = '{project_id}/{product}/{CORDEX_domain}/{institution_id}/{driving_model_id}/{experiment_id}/{model_id}/{rcm_version_id}/{frequency}'
-		self.filename = '{project_id}_{product}_{CORDEX_domain}_{institution_id}_{driving_model_id}_{experiment_id}_{driving_model_ensemble_member}_{model_id}_{rcm_version_id}_{frequency}.ncml'
+		self.filename = '{project_id}_{product}_{CORDEX_domain}_{driving_model_id}_{experiment_id}_{driving_model_ensemble_member}_{model_id}_{rcm_version_id}_{frequency}.ncml'
 		self.name = os.path.join(self.directory, self.filename)
 
 		self.template = 'cordex/cordex.ncml.j2'
@@ -52,7 +52,7 @@ class CordexNcmlAdapter(EsgfNcmlAdapter):
 		for r in preprocessed.index:
 			if preprocessed.loc[r, ('GLOBALS', 'institute_id')] not in preprocessed.loc[r, ('GLOBALS', 'model_id')]:
 				preprocessed.loc[r, ('GLOBALS', 'model_id')] = \
-				'-'.join(preprocessed.loc[r, ('GLOBALS', 'institute_id')], preprocessed.loc[r, ('GLOBALS', 'model_id')])
+				'-'.join([preprocessed.loc[r, ('GLOBALS', 'institute_id')], preprocessed.loc[r, ('GLOBALS', 'model_id')]])
 
 		return preprocessed
 
