@@ -8,6 +8,14 @@ class Adapter():
 		self.rtemplate = 'root.xml.j2'
 
 	def group(self, file):
+		"""Given a dataset returns a string key used to classify the dataset
+
+		Parameters:
+		file (string): Full path to the dataset in the filesystem
+
+		Returns:
+		string: Key used to group the dataset
+		"""
 		raise NotImplementedError
 
 	def process_dataset(self, dataset):
@@ -32,72 +40,27 @@ class Adapter():
 		"""
 		raise NotImplementedError
 
-class BaseAdapter(Adapter):
-	def process_dataset(self, dataset):
-		ext = os.path.splitext(dataset)[1]
-		if ext == ".ncml":
-			d = self.process_ncml(dataset)
-		else:
-			d = self.process_nc(dataset)
+	def catalog(self, catalog, datasets):
+		"""Given a catalog identifier and a list of datasets, creates a TDS catalog
+		in the filesystem and returns its path
 
-		return d
+		Parameters:
+		catalog (string): Catalog identifier as returned by group()
+		datasets (list): List of dicts where each dict is a dataset as returned by process_dataset()
 
-	def process_catalog(self, catalog):
-		tree = etree.parse(catalog)
-		namespaces = {'unidata': 'http://www.unidata.ucar.edu/namespaces/thredds/InvCatalog/v1.0'}
-		name = tree.xpath('/unidata:catalog/@name', namespaces=namespaces)[0]
+		Returns:
+		string: Path of the catalog in the filesystem
+		"""
+		raise NotImplementedError
 
-		return {
-            'file': catalog,
-			'title': name,
-			'size': self.catalog_size(catalog),
-			'last_modified': datetime.fromtimestamp(os.stat(catalog).st_mtime)
-		}
+	def root_catalog(self, refs):
+		"""Given a list of TDS catalogs, create a TDS catalog in the filesystem
+		that references all catalogs
 
-	def process_ncml(self, ncml):
-		namespaces = {'unidata': 'http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2'}
-		tree = etree.parse(ncml)
+		Parameters:
+		refs (list): List of dicts where each dict is a catalog as returned by process_catalog()
 
-		basename = os.path.basename(ncml)
-		name = os.path.splitext(basename)[0]
-		ext = os.path.splitext(basename)[1]
-		last_modified = datetime.fromtimestamp(os.stat(ncml).st_mtime)
-		size = tree.xpath('/unidata:netcdf/unidata:attribute[@name="size"]', namespaces=namespaces)[0]
-		primary_variables = tree.xpath('/unidata:netcdf/unidata:attribute[@name="primary_variables"]', namespaces=namespaces)[0]
-
-		return {
-			'file': ncml,
-			'name': name,
-			'last_modified': last_modified,
-			'service': 'virtual',
-			'ext': ext,
-			'size': int(size.attrib['value']),
-			'primary_variables': primary_variables.attrib['value']
-		}
-
-	def process_nc(self, nc):
-		basename = os.path.basename(nc)
-		name = os.path.splitext(basename)[0]
-		ext = os.path.splitext(basename)[1]
-		last_modified = datetime.fromtimestamp(os.stat(nc).st_mtime)
-		size = os.stat(nc).st_size
-
-		return {
-			'file': nc,
-			'name': name,
-			'last_modified': last_modified,
-			'size': size,
-			'service': 'all',
-			'ext': ext
-		}
-
-	def catalog_size(self, catalog):
-		namespaces = {'unidata': 'http://www.unidata.ucar.edu/namespaces/thredds/InvCatalog/v1.0'}
-		tree = etree.parse(catalog)
-		sizes = tree.xpath('//unidata:dataSize', namespaces=namespaces)
-
-		total_size = 0
-		for s in sizes:
-			total_size += int(s.text)
-
-		return total_size
+		Returns:
+		string: Path of the catalog in the filesystem
+		"""
+		raise NotImplementedError

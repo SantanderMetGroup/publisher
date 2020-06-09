@@ -3,8 +3,9 @@
 		xmlns="http://www.unidata.ucar.edu/namespaces/thredds/InvCatalog/v1.0"
 		xmlns:xlink="http://www.w3.org/1999/xlink">
 
+  <datasetRoot path="{{ namespace }}" location="content/cordex"/>
   {% for catalog in catalogs|sort(attribute='title') %}
-  <catalogRef xlink:title="{{ catalog.title }}" xlink:href="{{ catalog.file|regex_replace('.*content/thredds/cmip6/' , '') }}" name="">
+  <catalogRef xlink:title="{{ catalog.title|replace('/', '_') }}" xlink:href="{{ catalog.title }}/catalog.xml" name="">
     <dataSize units="bytes">{{ catalog.size }}</dataSize>
     <date type="modified">{{ catalog.last_modified }}</date>
   </catalogRef>

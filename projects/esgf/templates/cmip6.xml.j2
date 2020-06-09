@@ -33,8 +33,8 @@
   </service>
   {% for dataset in datasets %}
   <dataset name="{{ dataset.name }}"
-           ID="{{ dataset.file|regex_replace('.*public/cmip6', 'cmip6')|replace('.ncml', '') }}"
-           urlPath="devel/atlas/{{ dataset.file|regex_replace('.*public/cmip6', 'cmip6')|replace('.ncml', '') }}">
+           ID="{{ dataset.file|regex_replace('.*public/cmip6', namespace)|replace('.ncml', '') }}"
+           urlPath="{{ dataset.file|regex_replace('.*public/cmip6', namespace)|replace('.ncml', '') }}">
     <metadata inherited="true">
       <serviceName>{{ dataset.service }}</serviceName>
       <dataSize units="bytes">{{ dataset.size }}</dataSize>
@@ -42,7 +42,7 @@
       <property name="primary_variables" value="{{ dataset.primary_variables }}"/>
     </metadata>
     <netcdf xmlns="http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2"
-            location="{{ dataset.file|regex_replace('.*public/cmip6', 'content/cmip6' ) }}"/>
+            location="{{ dataset.file }}"/>
   </dataset>
   {% endfor %}
 </catalog>

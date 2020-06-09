@@ -33,13 +33,15 @@
   </service>
   {% for dataset in datasets %}
   <dataset name="{{ dataset.name }}"
-           ID="{{ dataset.file|regex_replace('.*tds-content/public/CORDEX', 'CORDEX') }}"
-           urlPath="{{ dataset.file|regex_replace('.*tds-content/public/CORDEX', 'CORDEX') }}">
+           ID="{{ dataset.file|regex_replace('.*public/cordex', namespace)|replace('.ncml', '') }}"
+           urlPath="{{ dataset.file|regex_replace('.*public/cordex', namespace)|replace('.ncml', '') }}">
     <metadata inherited="true">
       <serviceName>{{ dataset.service }}</serviceName>
       <dataSize units="bytes">{{ dataset.size }}</dataSize>
       <date type="modified">{{ dataset.last_modified }}</date>
     </metadata>
+    <netcdf xmlns="http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2"
+            location="{{ dataset.file }}"/>
   </dataset>
   {% endfor %}
 </catalog>

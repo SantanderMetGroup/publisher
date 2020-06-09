@@ -2,78 +2,68 @@
 
 import os, sys
 import argparse
-import re
-from datetime import datetime
-
 from collections import defaultdict
-from jinja2 import Environment, FileSystemLoader, select_autoescape, Template
 
-from catalog.adapter import *
-from projects.cmip6 import Cmip6CatalogAdapter
-from projects.cordex import CordexCatalogAdapter
-from projects.cordexEsdm import InterimCordexEsdmCatalogAdapter, EcearthCordexEsdmCatalogAdapter
+from catalog.adapter import Adapter
 
-def generate_root(root, root_name, template, adapter):
+# ESGF
+from projects.esgf.cmip6 import Cmip6CatalogAdapter
+from projects.esgf.cordex import CordexCatalogAdapter
+
+# CordexEsdm
+from projects.cordexEsdm.cordexEsdm import InterimCordexEsdmCatalogAdapter
+from projects.cordexEsdm.cordexEsdm import EcearthCordexEsdmCatalogAdapter
+from projects.cordexEsdm.cordexEsdm import CordexEsdmCatalogAdapter
+
+def generate_root(adapter):
 	refs = []
 	for catalog in sys.stdin.read().splitlines():
 		fpath = os.path.abspath(catalog)
 		refs.append(adapter.process_catalog(fpath))
 
-	templates = os.path.join(os.path.dirname(__file__), 'templates/catalogs')
-	env = Environment(loader=FileSystemLoader(templates), autoescape=select_autoescape(['xml']))
-	env.filters['regex_replace'] = lambda s, find, replace: re.sub(find, replace, s)
-	template = env.get_template(template)
+	path = adapter.root_catalog(refs)
+	print(path)
 
-	with open(root, 'w+') as fh:
-		fh.write(template.render(name=root_name, catalogs=refs))
-
-	print(root)
-
-def generate(catalog, name, datasets, template):
-	templates = os.path.join(os.path.dirname(__file__), 'templates/catalogs')
-	env = Environment(loader=FileSystemLoader(templates), autoescape=select_autoescape(['xml']))
-
-	env.filters['regex_replace'] = lambda s, find, replace: re.sub(find, replace, s)
-	env.tests['isncml'] = lambda dataset: dataset['ext'] == ".ncml"
-	env.tests['isnc'] = lambda dataset: dataset['ext'] != ".ncml"
-
-	template = env.get_template(template)
-	os.makedirs(os.path.dirname(catalog), exist_ok=True)
-	with open(catalog, 'w+') as fh:
-		fh.write(template.render(name=name, datasets=datasets))
-
-	print(catalog)
-
-
-def generate_tree(name, dest, adapter):
+def generate_tree(adapter):
 	catalogs = defaultdict(list)
 
 	for f in sys.stdin.read().splitlines():
-		dataset = adapter.process_dataset(f)
-
-		# add dataset to corresponding catalog
-		group = adapter.group(f)
+		full_path = os.path.abspath(f)
+		dataset = adapter.process_dataset(full_path)
+		group = adapter.group(full_path)
 		catalogs[group].append(dataset)
 
-	# generate catalogs
 	for catalog in catalogs:
-		catalog_name = '_'.join([name, catalog.replace('/', '_')]) if name else catalog.replace('/', '_')
-		generate(os.path.join(dest, catalog, 'catalog.xml'), catalog_name, catalogs[catalog], adapter.template)
+		path = adapter.catalog(catalog, catalogs[catalog])
+		print(path)
 
 if __name__ == '__main__':
-	parser = argparse.ArgumentParser(description='Create a catalog from a list of ncmls.')
-
-	# used in tree generation and root catalog
-	parser.add_argument('--name', dest='name', type=str, help='Name for root catalog or string to prepend for tree catalogs')
-	parser.add_argument('--dest', dest='dest', type=str, help='Destination directory.')
-	parser.add_argument('--adapter', dest='adapter', type=str, help='Adapter class.')
-	# root catalog generation
-	parser.add_argument('--root', dest='root', type=str, default=None, help='Generate root catalog')
-	parser.add_argument('--template', dest='template', type=str, help='Template to use.')
-
+	parser = argparse.ArgumentParser(description='Create catalogs from datasets or catalogs from stdin.')
+	parser.add_argument(
+		'--dest',
+		dest='dest',
+		required=True,
+		type=str,
+		help='Destination directory.')
+	parser.add_argument(
+		'--adapter',
+		dest='adapter',
+		type=str,
+		help='Adapter class.')
+	parser.add_argument(
+		'--root',
+		dest='root',
+		action='store_true',
+		default=False,
+		help='Generate root catalog.')
 	args = parser.parse_args()
-	adapter = globals()[args.adapter]()
-	if args.root:
-		generate_root(args.root, args.name, args.template, adapter)
+
+	if args.adapter is None:
+		adapter = Adapter()
 	else:
-		generate_tree(args.name, args.dest, adapter)
+		adapter = globals()[args.adapter](args.dest)
+
+	if args.root:
+		generate_root(adapter)
+	else:
+		generate_tree(adapter)
