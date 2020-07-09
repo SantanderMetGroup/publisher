@@ -32,14 +32,17 @@
     <service base="/thredds/uddc/" name="uddc" serviceType="UDDC" />
   </service>
   {% for dataset in datasets %}
-  <dataset name="{{ dataset.name }}"
-           ID="{{ dataset.file|regex_replace('.*public/cmip6', 'cmip6') }}"
-           urlPath="{{ dataset.file|regex_replace('.*public/cmip6', 'cmip6') }}">
+  <dataset name="{{ dataset.name|replace('/', '.') }}"
+           ID="{{ dataset.file|regex_replace('.*public/cmip5', namespace)|replace('.ncml', '') }}"
+           urlPath="{{ dataset.file|regex_replace('.*public/cmip5', namespace)|replace('.ncml', '') }}">
     <metadata inherited="true">
       <serviceName>{{ dataset.service }}</serviceName>
       <dataSize units="bytes">{{ dataset.size }}</dataSize>
       <date type="modified">{{ dataset.last_modified }}</date>
+      <property name="primary_variables" value="{{ dataset.primary_variables }}"/>
     </metadata>
+    <netcdf xmlns="http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2"
+            location="{{ dataset.file }}"/>
   </dataset>
   {% endfor %}
 </catalog>

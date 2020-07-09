@@ -31,29 +31,34 @@
     <service base="/thredds/ncml/" name="ncml" serviceType="NCML" />
     <service base="/thredds/uddc/" name="uddc" serviceType="UDDC" />
   </service>
-  {% set nc_prefix="/oceano/gmeteo/WORK/bmedina/CORDEX-ESDM/" %}
+
   {% for dataset in datasets|select("isncml") %}
   <dataset name="{{ dataset.name }}"
-           ID="cordex-esdm/aggregated/{{ dataset.file|regex_replace('.*public/cordex-esdm/', 'cordex-esdm') }}"
-           urlPath="cordex-esdm/aggregated/{{ dataset.file|regex_replace('.*public/cordex-esdm/', 'cordex-esdm') }}">
+           ID="cordex-esdm/aggregated/{{ dataset.file|regex_replace('.*public/cordex-esdm/', '') }}"
+           urlPath="cordex-esdm/aggregated/{{ dataset.file|regex_replace('.*public/cordex-esdm/', '') }}">
     <metadata inherited="true">
       <serviceName>{{ dataset.service }}</serviceName>
       <dataSize units="bytes">{{ dataset.size }}</dataSize>
       <date type="modified">{{ dataset.last_modified }}</date>
     </metadata>
   </dataset>
+
   {% endfor %}
-  <dataset name="{{ (datasets|select('isncml')|first).name }} files" ID="{{ name }}/files">
+  <dataset name="{{ (datasets|select('isncml')|first).name }} files"
+           ID="{{ (datasets|select('isncml')|first).name }}/files">
     {% for dataset in datasets|select("isnc")|sort(attribute="name") %}
     <dataset name="{{ dataset.name }}"
-             ID="cordex-esdm/files/{{ dataset.file|replace(nc_prefix, '') }}"
-             urlPath="cordex-esdm/files/{{ dataset.file|replace(nc_prefix, '') }}">
+             ID="cordex-esdm/files/{{ dataset.file|replace('/oceano/gmeteo/WORK/bmedina/CORDEX-ESDM/', '') }}"
+             urlPath="cordex-esdm/files/{{ dataset.file|replace('/oceano/gmeteo/WORK/bmedina/CORDEX-ESDM/', '') }}">
       <metadata inherited="true">
         <serviceName>{{ dataset.service }}</serviceName>
         <dataSize units="bytes">{{ dataset.size }}</dataSize>
         <date type="modified">{{ dataset.last_modified }}</date>
       </metadata>
+      <netcdf xmlns="http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2"
+              location="{{ dataset.file }}"/>
     </dataset>
+
     {% endfor %}
   </dataset>
 </catalog>

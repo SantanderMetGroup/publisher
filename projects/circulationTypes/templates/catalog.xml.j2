@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<catalog name="{{ name }}"
+<catalog name="Circulation Types"
 		xmlns="http://www.unidata.ucar.edu/namespaces/thredds/InvCatalog/v1.0"
 		xmlns:xlink="http://www.w3.org/1999/xlink">
 
@@ -32,15 +32,19 @@
     <service base="/thredds/uddc/" name="uddc" serviceType="UDDC" />
   </service>
 
-  {% for dataset in datasets %}
-  <dataset name="{{ dataset.name }}"
-           ID="{{ dataset.path  }}/{{ dataset.urlPath }}"
-           urlPath="{{ dataset.path  }}/{{ dataset.urlPath }}">
+  {% for dataset in datasets|sort(attribute="name") %}
+  <dataset name="{{ dataset.name|replace('/', '.') }}"
+           ID="{{ dataset.file|regex_replace('.*public/circulation-types', namespace)|replace('.ncml', '') }}"
+           urlPath="{{ dataset.file|regex_replace('.*public/circulation-types', namespace)|replace('.ncml', '') }}">
     <metadata inherited="true">
       <serviceName>{{ dataset.service }}</serviceName>
       <dataSize units="bytes">{{ dataset.size }}</dataSize>
       <date type="modified">{{ dataset.last_modified }}</date>
+      <property name="primary_variables" value="{{ dataset.primary_variables }}"/>
     </metadata>
+    <netcdf xmlns="http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2"
+            location="{{ dataset.file|regex_replace('.*public/circulation-types', 'content/circulation-types') }}"/>
   </dataset>
+
   {% endfor %}
 </catalog>
