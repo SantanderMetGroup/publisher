@@ -32,8 +32,16 @@ def read(files):
                     attrs[('GLOBALS', attr)] = ds.getncattr(attr)
             
                 for variable in ds.variables:
+                    dimensions = ds.variables[variable].dimensions
+                    attrs[(variable, '_dimensions')] = ','.join(dimensions)
                     for attr in ds[variable].ncattrs():
                         attrs[(variable, attr)] = ds[variable].getncattr(attr)
+
+                for dimension in ds.dimensions:
+                    name = ds.dimensions[dimension].name
+                    size = ds.dimensions[dimension].size
+                    attrs[('_'.join(['_d', dimension]), 'name')] = name
+                    attrs[('_'.join(['_d', dimension]), 'size')] = size
     
                 # This is so often required that it's fair to include it here
                 # Just be careful about overwriting existing attributes
@@ -47,7 +55,7 @@ def read(files):
             print("Error while reading netCDF file {0}".format(f), file=sys.stderr)
             print("Error: {0}".format(err), file=sys.stderr)
 
-if __name__ == '__main__':
+def args(argv):
     args = {
         'file': None,
         'dest': 'unnamed.hdf',
@@ -58,37 +66,42 @@ if __name__ == '__main__':
     }
 
     position = 1
-    arguments = len(sys.argv) - 1
+    arguments = len(argv) - 1
     if arguments < 1:
         print(_help)
         sys.exit(1)
 
     while arguments >= position:
-        if sys.argv[position] == '-h' or sys.argv[position] == '--help':
+        if argv[position] == '-h' or argv[position] == '--help':
             print(_help)
             sys.exit(1)
-        elif sys.argv[position] == '-f' or sys.argv[position] == '--file':
-            args['file'] = sys.argv[position+1]
+        elif argv[position] == '-f' or argv[position] == '--file':
+            args['file'] = argv[position+1]
             position+=2
-        elif sys.argv[position] == '-n' or sys.argv[position] == '--name':
-            args['name'] = sys.argv[position+1]
+        elif argv[position] == '-n' or argv[position] == '--name':
+            args['name'] = argv[position+1]
             position+=2
-        elif sys.argv[position] == '-g' or sys.argv[position] == '--groupby':
-            fs = sys.argv[position+1]
+        elif argv[position] == '-g' or argv[position] == '--groupby':
+            fs = argv[position+1]
             args['groupby'] = [('GLOBALS', f) for f in fs.split(',')]
             position+=2
-        elif sys.argv[position] == '--drs':
-            args['drs'] = sys.argv[position+1]
+        elif argv[position] == '--drs':
+            args['drs'] = argv[position+1]
             position+=2
-        elif sys.argv[position] == '--drs-sep':
-            args['drs_sep'] = sys.argv[position+1]
+        elif argv[position] == '--drs-sep':
+            args['drs_sep'] = argv[position+1]
             position+=2
-        elif sys.argv[position] == '--drs-prefix':
-            args['drs_sep'] = sys.argv[position+1]
+        elif argv[position] == '--drs-prefix':
+            args['drs_sep'] = argv[position+1]
             position+=2
         else:
-            args['dest'] = sys.argv[position]
+            args['dest'] = argv[position]
             position+=1
+
+    return args
+
+if __name__ == '__main__':
+    args = args(sys.argv)
 
     if args['file'] is None:
         df = pd.DataFrame(read(sys.stdin.read().splitlines()))
