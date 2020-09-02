@@ -3,6 +3,7 @@
 import os, sys
 import cfgrib
 import pandas as pd
+from multiprocessing import Pool
 
 _help = '''Usage:
     gribtodf [options] DATAFRAME
@@ -10,6 +11,7 @@ _help = '''Usage:
 Options:
     -f, --file FILE         Read from FILE instead of stdin.
     -h, --help              Display this message and exit.
+    -j                      Number of parallel processes.
     -n, --name NAME         Name the dataframe with name NAME (default is '').
     -g, --groupby GROUP     Comma separated names of columns to groupby under GLOBALS.
 
@@ -20,37 +22,49 @@ Options:
     --drs-prefix PREFIX     Prefix to be prepended to facets in --drs (default is '_DRS').
 '''
 
-def read(files):
-    for f in files:
-        try:
-            attrs = {}
-            attrs[('GLOBALS', 'size')] = os.stat(f).st_size
-            attrs[('GLOBALS', 'localpath')] = os.path.abspath(f)
+def read(f):
+   try:
+       attrs = {}
+       attrs[('GLOBALS', 'size')] = os.stat(f).st_size
+       attrs[('GLOBALS', 'localpath')] = os.path.abspath(f)
 
-            with cfgrib.open_dataset(f) as ds:
-                for attr in ds.attrs:
-                    attrs[('GLOBALS', attr)] = ds.attrs[attr]
-                for variable in ds.variables:
-                    for attr in ds[variables].attrs:
-                        attrs[variable][attr] = ds[variable].attrs[attr]
+       with cfgrib.open_dataset(f, backend_kwargs={'indexpath': ''}) as ds:
+           for attr in ds.attrs:
+               attrs[('GLOBALS', attr)] = ds.attrs[attr]
+           for variable in ds.variables:
+               for attr in ds[variable].attrs:
+                   attrs[(variable, attr)] = ds[variable].attrs[attr]
 
-                # This is so often required that it's fair to include it here
-                # Just be careful about overwriting existing attributes
-                if 'time' in ds.variables:
-                    attrs[('time', 'ncoords')] = ds.variables['time'].size
-                    attrs[('time', 'value0')] = ds.variables['time'][0]
-                    attrs[('time', 'increment')] = ds.variables['time'][1] - ds.variables['time'][0]
-        
-            yield attrs
-        except Exception as err:
-            print("Error while reading GRIB file {0}".format(f), file=sys.stderr)
-            print("Error: {0}".format(err), file=sys.stderr)
+       return attrs
+   except Exception as err:
+       print("Error while reading GRIB file {0}".format(f), file=sys.stderr)
+       print("Error: {0}".format(err), file=sys.stderr)
+
+#def read(files):
+#    for f in files:
+#        try:
+#            attrs = {}
+#            attrs[('GLOBALS', 'size')] = os.stat(f).st_size
+#            attrs[('GLOBALS', 'localpath')] = os.path.abspath(f)
+#        
+#            with cfgrib.open_dataset(f, backend_kwargs={'indexpath': ''}) as ds:
+#                for attr in ds.attrs:
+#                    attrs[('GLOBALS', attr)] = ds.attrs[attr]
+#                for variable in ds.variables:
+#                    for attr in ds[variable].attrs:
+#                        attrs[(variable, attr)] = ds[variable].attrs[attr]
+#        
+#            yield attrs
+#        except Exception as err:
+#            print("Error while reading GRIB file {0}".format(f), file=sys.stderr)
+#            print("Error: {0}".format(err), file=sys.stderr)
 
 if __name__ == '__main__':
     args = {
         'file': None,
         'dest': 'unnamed.hdf',
         'name': '',
+        'j': 1,
         'groupby': None,
         'drs': None,
         'drs_sep': '[/_]',
@@ -68,6 +82,9 @@ if __name__ == '__main__':
             sys.exit(1)
         elif sys.argv[position] == '-f' or sys.argv[position] == '--file':
             args['file'] = sys.argv[position+1]
+            position+=2
+        elif sys.argv[position] == '-j':
+            args['j'] = int(sys.argv[position+1])
             position+=2
         elif sys.argv[position] == '-n' or sys.argv[position] == '--name':
             args['name'] = sys.argv[position+1]
@@ -89,10 +106,17 @@ if __name__ == '__main__':
             args['dest'] = sys.argv[position]
             position+=1
 
-    if args['file'] is None:
-        df = pd.DataFrame(read(sys.stdin.read().splitlines()))
-    else:
-        df = pd.DataFrame(read(args['file'].read().splitlines()))
+    with Pool(args['j']) as pool:
+        if args['file'] is None:
+            d = pool.map(read, sys.stdin.read().splitlines())
+        else:
+            d = pool.map(read, args['file'].read().splitlines())
+    df = pd.DataFrame(d)
+
+#    if args['file'] is None:
+#        df = pd.DataFrame(read(sys.stdin.read().splitlines()))
+#    else:
+#        df = pd.DataFrame(read(args['file'].read().splitlines()))
 
     if len(df) == 0:
         print('Empty DataFrame, exiting...')
