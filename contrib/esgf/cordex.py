@@ -3,6 +3,7 @@
 import os
 import sys
 import pandas as pd
+import cftime
 
 import esgf
 
@@ -65,11 +66,15 @@ def clean(df):
 
     # netcdfs from CAS-22_NCC-NorESM1-M_rcp26_r0i0p0_GERICS-REMO2015 have ensemble before extension
     # set every _DRS_period column of fixed variables to None to prevent more failures
-    df.loc[df[('GLOBALS', 'frequency')] == 'fx', ('GLOBALS', '_DRS_period')] = None
+    df.loc[df[('GLOBALS', '_DRS_Dfrequency')] == 'fx', ('GLOBALS', '_DRS_period')] = None
     df[('GLOBALS', 'period1')] = df[('GLOBALS', '_DRS_period')].str.split('-', expand=True).iloc[:,0].fillna(0).astype(int)
     df[('GLOBALS', 'period2')] = df[('GLOBALS', '_DRS_period')].str.split('-', expand=True).iloc[:,1].fillna(0).astype(int)
 
     df[('time', 'units')] = df[('time', 'units')].str.replace(' UTC', '')
+
+    # Be sure that df has tracking_id column
+    if not (('GLOBALS', 'tracking_id') in df.columns):
+        df[('GLOBALS', 'tracking_id')] = None
 
     # Add institute to RCMModelName (institute-rcm)
     for r in df.index:
@@ -103,10 +108,33 @@ if __name__ == '__main__':
         sys.exit(1)
 
     df = pd.read_hdf(args['dataframe'], 'df')
-    df = esgf.include_drs(df, drs)
+    print('* contrib/esgf/cordex.py on {0}'.format(args['dataframe']), file=sys.stderr)
+
+    # Parse DRS, if all ncs in df are fx frequency, we need to fix drs_df
+    drs_df = esgf.get_drs_df(df[('GLOBALS', 'localpath')], drs)
+    if (drs_df.iloc[:,0] != 'cordex').any():
+        drs_df = drs_df.drop(axis=1, columns=[6])
+        drs_df[27] = None # This is the 'period' facet, None for fx frequency
+        print('Error: Dataframe {0} only contains fx datasets'.format(args['dataframe']), file=sys.stderr)
+        sys.exit(1)
+    drs_df.columns = [('GLOBALS', ''.join(['_DRS_', f])) for f in drs.split(',')]
+    df = pd.concat([df, drs_df], axis=1)
+
     df = clean(df)
     df = esgf.get_latest_versions(df, group_latest_versions)
     df = esgf.get_time_values(df, group_latest_versions)
+
+    # ncs from cordex_output_NAM-44_UQAM_CCCma-CanESM2_historical begin with calendar gregorian_proleptic
+    # but then use 365_day, so we set manually the values of gregorian_proleptic to 365_day
+    subset = ((df[('GLOBALS', '_DRS_Dmodel')] == 'CCCma-CanESM2') &
+              (df[('GLOBALS', '_DRS_Dexperiment')] == 'historical') &
+              (df[('GLOBALS', '_DRS_Ddomain')] == 'NAM-44') &
+              (df[('GLOBALS', '_DRS_Dfrequency')] == 'day') &
+              (df[('GLOBALS', '_DRS_period')].str.split('-').str.get(0) == "19500101") &
+              (df[('time', 'calendar')] == 'proleptic_gregorian'))
+    df.loc[subset, ('time', 'calendar')] = '365_day'
+
+    df = esgf.fix_time_values(df, group_latest_versions)
 
     for dataset in esgf.group(df, group_time, group_fx):
         D = dict(dataset[dataset[('GLOBALS', '_DRS_Dfrequency')] != 'fx']['GLOBALS'].iloc[0])
