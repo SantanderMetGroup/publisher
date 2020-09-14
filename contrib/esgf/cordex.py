@@ -2,8 +2,8 @@
 
 import os
 import sys
+import numpy as np
 import pandas as pd
-import cftime
 
 import esgf
 
@@ -82,6 +82,10 @@ def clean(df):
             df.loc[r, ('GLOBALS', '_DRS_rcm')] = \
                 '-'.join([df.loc[r, ('GLOBALS', '_DRS_Dinstitution')], df.loc[r, ('GLOBALS', '_DRS_rcm')]])
 
+    # It appears that some files are duplicated under different DRS, remove all
+    # ex: find /oceano/gmeteo/DATA/ESGF/REPLICA/DATA/cordex/output/SEA-22/RU-CORE/MPI-M-MPI-ESM-MR/rcp45/r1i1p1/ -type f -name pr_SEA-22_MPI-M-MPI-ESM-MR_rcp45_r1i1p1_ICTP-RegCM4-3_v4_day_2006010112-2006013112.nc
+    df = df.drop_duplicates(subset=[('GLOBALS', 'filename')])
+
     return df
 
 if __name__ == '__main__':
@@ -117,12 +121,26 @@ if __name__ == '__main__':
         drs_df[27] = None # This is the 'period' facet, None for fx frequency
         print('Error: Dataframe {0} only contains fx datasets'.format(args['dataframe']), file=sys.stderr)
         sys.exit(1)
+
     drs_df.columns = [('GLOBALS', ''.join(['_DRS_', f])) for f in drs.split(',')]
     df = pd.concat([df, drs_df], axis=1)
 
+    # Start cleaning stuff
     df = clean(df)
     df = esgf.get_latest_versions(df, group_latest_versions)
-    df = esgf.get_time_values(df, group_latest_versions)
+
+    # read coordinate variables
+    df[('time', 'values')] = df.apply(lambda series: esgf.get_variable('time', series[('GLOBALS', 'localpath')]), axis=1)
+    # Instead of rlon and rlat, coordinate variables are named x and y, so
+    # I need the values to create rlon and rlat in the NcML (do I?)
+    if '_d_x' in df.columns.get_level_values(0):
+        df[('x', 'values')] = df.apply(lambda series: list(esgf.get_variable('x', series[('GLOBALS', 'localpath')])), axis=1)
+    if '_d_y' in df.columns.get_level_values(0):
+        df[('y', 'values')] = df.apply(lambda series: list(esgf.get_variable('y', series[('GLOBALS', 'localpath')])), axis=1)
+
+    # for CORDEX_output_WAS-22_NCC-NorESM1-M_rcp26_r1i1p1_CLMcom-ETH-COSMO-crCLIM-v1-1_v1_day
+    # precipitation time values were added decimals when converted to float so I limit number of decimals
+    df[('time', 'values')] = df[('time', 'values')].apply(lambda x: np.round(x, decimals=6))
 
     # ncs from cordex_output_NAM-44_UQAM_CCCma-CanESM2_historical begin with calendar gregorian_proleptic
     # but then use 365_day, so we set manually the values of gregorian_proleptic to 365_day

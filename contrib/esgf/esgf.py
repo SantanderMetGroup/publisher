@@ -98,6 +98,18 @@ def time_values(series):
         print("Error: {0}".format(err), file=sys.stderr)
         sys.exit(1)
 
+def get_variable(variable, path):
+    try:
+        with netCDF4.Dataset(path) as ds:
+            if variable in ds.variables:
+                return ds.variables[variable][:]
+            else:
+                return []
+    except Exception as err:
+        print("Error while reading variable {0} values of {1}".format(variable, path), file=sys.stderr)
+        print("Error: {0}".format(err), file=sys.stderr)
+        sys.exit(1)
+
 def get_latest_versions(df, facets):
     how_to_group = [('GLOBALS', f) for f in facets]
 
