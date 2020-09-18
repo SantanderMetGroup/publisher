@@ -142,6 +142,12 @@ if __name__ == '__main__':
     # precipitation time values were added decimals when converted to float so I limit number of decimals
     df[('time', 'values')] = df[('time', 'values')].apply(lambda x: np.round(x, decimals=6))
 
+    # for pr_SAM-44_MPI-M-MPI-ESM-MR_historical_r1i1p1_ICTP-RegCM4-3_v4_day_1970010112-1975123112.nc
+    # time values are bad defined, set them manually
+    bad_file = '.*pr_SAM-44_MPI-M-MPI-ESM-MR_historical_r1i1p1_ICTP-RegCM4-3_v4_day_1970010112-1975123112.nc'
+    subset = df[('GLOBLALS', 'localpath')].str.match(bad_file)
+    df.at[df[subset].index[0], ('time', 'values')] = np.arange(7336.5,9527.5,1)
+
     # ncs from cordex_output_NAM-44_UQAM_CCCma-CanESM2_historical begin with calendar gregorian_proleptic
     # but then use 365_day, so we set manually the values of gregorian_proleptic to 365_day
     subset = ((df[('GLOBALS', '_DRS_Dmodel')] == 'CCCma-CanESM2') &
