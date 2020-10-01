@@ -114,9 +114,12 @@ if __name__ == '__main__':
     df = pd.read_hdf(args['dataframe'], 'df')
     print('* contrib/esgf/cordex.py on {0}'.format(args['dataframe']), file=sys.stderr)
 
+    # If DRS is esgprep like (files/dVERSION) instead of synda like (vVERSION), convert to synda like
+    df[('GLOBALS', 'synda_localpath')] = df[('GLOBALS', 'localpath')].str.replace('files/d([0-9]{6})', 'v\\1')
+
     # Parse DRS, if all ncs in df are fx frequency, we need to fix drs_df
-    drs_df = esgf.get_drs_df(df[('GLOBALS', 'localpath')], drs)
-    if (drs_df.iloc[:,0] != 'cordex').any():
+    drs_df = esgf.get_drs_df(df[('GLOBALS', 'synda_localpath')], drs)
+    if (drs_df.iloc[:,0].str.lower() != 'cordex').any():
         drs_df = drs_df.drop(axis=1, columns=[6])
         drs_df[27] = None # This is the 'period' facet, None for fx frequency
         print('Error: Dataframe {0} only contains fx datasets'.format(args['dataframe']), file=sys.stderr)
@@ -142,11 +145,14 @@ if __name__ == '__main__':
     # precipitation time values were added decimals when converted to float so I limit number of decimals
     df[('time', 'values')] = df[('time', 'values')].apply(lambda x: np.round(x, decimals=6))
 
-    # for pr_SAM-44_MPI-M-MPI-ESM-MR_historical_r1i1p1_ICTP-RegCM4-3_v4_day_1970010112-1975123112.nc
-    # time values are bad defined, set them manually
-    bad_file = '.*pr_SAM-44_MPI-M-MPI-ESM-MR_historical_r1i1p1_ICTP-RegCM4-3_v4_day_1970010112-1975123112.nc'
-    subset = df[('GLOBLALS', 'localpath')].str.match(bad_file)
-    df.at[df[subset].index[0], ('time', 'values')] = np.arange(7336.5,9527.5,1)
+    # CORDEX_output_SAM-44_MPI-M-MPI-ESM-MR_rcp85_r1i1p1_ICTP-RegCM4-3_v4_day has
+    # incorrect (not monotonically increasing) time coordinate, generate manually
+    subset = ((df[('time', 'values')].apply(lambda a: not np.all(a[1:] >= a[:-1]))) &
+              (df[('GLOBALS', '_DRS_Dmodel')] == 'MPI-M-MPI-ESM-MR') &
+              (df[('GLOBALS', '_DRS_Ddomain')] == 'SAM-44') &
+              (df[('GLOBALS', '_DRS_Dfrequency')] == 'day'))
+    df.loc[subset, ('time', 'values')] = (df.loc[subset, ('time', 'values')]
+                                            .apply(lambda a: np.arange(a[0], a[0]+len(a))))
 
     # ncs from cordex_output_NAM-44_UQAM_CCCma-CanESM2_historical begin with calendar gregorian_proleptic
     # but then use 365_day, so we set manually the values of gregorian_proleptic to 365_day
