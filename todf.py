@@ -45,7 +45,7 @@ def read(files):
     
                 # This is so often required that it's fair to include it here
                 # Just be careful about overwriting existing attributes
-                if 'time' in ds.variables:
+                if 'time' in ds.variables and ds.variables['time'].size > 1:
                     attrs[('time', 'ncoords')] = ds.variables['time'].size
                     attrs[('time', 'value0')] = ds.variables['time'][0]
                     attrs[('time', 'increment')] = ds.variables['time'][1] - ds.variables['time'][0]

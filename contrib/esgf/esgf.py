@@ -6,6 +6,11 @@ import numpy as np
 import netCDF4
 import cftime
 
+def get_drs_df(localpaths, drs):
+    ndrs = len(drs.split(','))
+    drs_df = localpaths.apply(lambda x: os.path.splitext(x)[0]).str.split('[/_]', expand=True).iloc[:, -ndrs:]
+    return drs_df
+
 def include_drs(df, drs, prefix=None):
     if prefix is None:
         prefix = '_DRS_'
@@ -51,11 +56,10 @@ def render(df, dest):
     store['df'] = df
     store.close()
 
+    # I should definetly return the path, not print it here...
     print(dest)
 
-def get_time_values(df, facets):
-    df[('time', 'values')] = df.apply(time_values, axis=1)
-
+def fix_time_values(df, facets):
     # So, I have collected all time values but I have to make
     # them start from the same reference
     how_to_group = [('GLOBALS', f) for f in facets]
@@ -77,6 +81,10 @@ def get_time_values(df, facets):
 
     return df
 
+def get_time_values(df, facets):
+    df[('time', 'values')] = df.apply(time_values, axis=1)
+    return df
+
 def time_values(series):
     f = series[('GLOBALS', 'localpath')]
     try:
@@ -87,6 +95,18 @@ def time_values(series):
                 return []
     except Exception as err:
         print("Error while reading time values of {0}".format(f), file=sys.stderr)
+        print("Error: {0}".format(err), file=sys.stderr)
+        sys.exit(1)
+
+def get_variable(variable, path):
+    try:
+        with netCDF4.Dataset(path) as ds:
+            if variable in ds.variables:
+                return ds.variables[variable][:]
+            else:
+                return []
+    except Exception as err:
+        print("Error while reading variable {0} values of {1}".format(variable, path), file=sys.stderr)
         print("Error: {0}".format(err), file=sys.stderr)
         sys.exit(1)
 

@@ -2,6 +2,7 @@
 
 import os
 import sys
+import numpy as np
 import pandas as pd
 
 import esgf
@@ -65,17 +66,25 @@ def clean(df):
 
     # netcdfs from CAS-22_NCC-NorESM1-M_rcp26_r0i0p0_GERICS-REMO2015 have ensemble before extension
     # set every _DRS_period column of fixed variables to None to prevent more failures
-    df.loc[df[('GLOBALS', 'frequency')] == 'fx', ('GLOBALS', '_DRS_period')] = None
+    df.loc[df[('GLOBALS', '_DRS_Dfrequency')] == 'fx', ('GLOBALS', '_DRS_period')] = None
     df[('GLOBALS', 'period1')] = df[('GLOBALS', '_DRS_period')].str.split('-', expand=True).iloc[:,0].fillna(0).astype(int)
     df[('GLOBALS', 'period2')] = df[('GLOBALS', '_DRS_period')].str.split('-', expand=True).iloc[:,1].fillna(0).astype(int)
 
     df[('time', 'units')] = df[('time', 'units')].str.replace(' UTC', '')
+
+    # Be sure that df has tracking_id column
+    if not (('GLOBALS', 'tracking_id') in df.columns):
+        df[('GLOBALS', 'tracking_id')] = None
 
     # Add institute to RCMModelName (institute-rcm)
     for r in df.index:
         if df.loc[r, ('GLOBALS', '_DRS_Dinstitution')] not in df.loc[r, ('GLOBALS', '_DRS_rcm')]:
             df.loc[r, ('GLOBALS', '_DRS_rcm')] = \
                 '-'.join([df.loc[r, ('GLOBALS', '_DRS_Dinstitution')], df.loc[r, ('GLOBALS', '_DRS_rcm')]])
+
+    # It appears that some files are duplicated under different DRS, remove all
+    # ex: find /oceano/gmeteo/DATA/ESGF/REPLICA/DATA/cordex/output/SEA-22/RU-CORE/MPI-M-MPI-ESM-MR/rcp45/r1i1p1/ -type f -name pr_SEA-22_MPI-M-MPI-ESM-MR_rcp45_r1i1p1_ICTP-RegCM4-3_v4_day_2006010112-2006013112.nc
+    df = df.drop_duplicates(subset=[('GLOBALS', 'filename')])
 
     return df
 
@@ -103,10 +112,59 @@ if __name__ == '__main__':
         sys.exit(1)
 
     df = pd.read_hdf(args['dataframe'], 'df')
-    df = esgf.include_drs(df, drs)
+    print('* contrib/esgf/cordex.py on {0}'.format(args['dataframe']), file=sys.stderr)
+
+    # If DRS is esgprep like (files/dVERSION) instead of synda like (vVERSION), convert to synda like
+    df[('GLOBALS', 'synda_localpath')] = df[('GLOBALS', 'localpath')].str.replace('files/d([0-9]{6})', 'v\\1')
+
+    # Parse DRS, if all ncs in df are fx frequency, we need to fix drs_df
+    drs_df = esgf.get_drs_df(df[('GLOBALS', 'synda_localpath')], drs)
+    if (drs_df.iloc[:,0].str.lower() != 'cordex').any():
+        drs_df = drs_df.drop(axis=1, columns=[6])
+        drs_df[27] = None # This is the 'period' facet, None for fx frequency
+        print('Error: Dataframe {0} only contains fx datasets'.format(args['dataframe']), file=sys.stderr)
+        sys.exit(1)
+
+    drs_df.columns = [('GLOBALS', ''.join(['_DRS_', f])) for f in drs.split(',')]
+    df = pd.concat([df, drs_df], axis=1)
+
+    # Start cleaning stuff
     df = clean(df)
     df = esgf.get_latest_versions(df, group_latest_versions)
-    df = esgf.get_time_values(df, group_latest_versions)
+
+    # read coordinate variables
+    df[('time', 'values')] = df.apply(lambda series: esgf.get_variable('time', series[('GLOBALS', 'localpath')]), axis=1)
+    # Instead of rlon and rlat, coordinate variables are named x and y, so
+    # I need the values to create rlon and rlat in the NcML (do I?)
+    if '_d_x' in df.columns.get_level_values(0):
+        df[('x', 'values')] = df.apply(lambda series: list(esgf.get_variable('x', series[('GLOBALS', 'localpath')])), axis=1)
+    if '_d_y' in df.columns.get_level_values(0):
+        df[('y', 'values')] = df.apply(lambda series: list(esgf.get_variable('y', series[('GLOBALS', 'localpath')])), axis=1)
+
+    # for CORDEX_output_WAS-22_NCC-NorESM1-M_rcp26_r1i1p1_CLMcom-ETH-COSMO-crCLIM-v1-1_v1_day
+    # precipitation time values were added decimals when converted to float so I limit number of decimals
+    df[('time', 'values')] = df[('time', 'values')].apply(lambda x: np.round(x, decimals=6))
+
+    # CORDEX_output_SAM-44_MPI-M-MPI-ESM-MR_rcp85_r1i1p1_ICTP-RegCM4-3_v4_day has
+    # incorrect (not monotonically increasing) time coordinate, generate manually
+    subset = ((df[('time', 'values')].apply(lambda a: not np.all(a[1:] >= a[:-1]))) &
+              (df[('GLOBALS', '_DRS_Dmodel')] == 'MPI-M-MPI-ESM-MR') &
+              (df[('GLOBALS', '_DRS_Ddomain')] == 'SAM-44') &
+              (df[('GLOBALS', '_DRS_Dfrequency')] == 'day'))
+    df.loc[subset, ('time', 'values')] = (df.loc[subset, ('time', 'values')]
+                                            .apply(lambda a: np.arange(a[0], a[0]+len(a))))
+
+    # ncs from cordex_output_NAM-44_UQAM_CCCma-CanESM2_historical begin with calendar gregorian_proleptic
+    # but then use 365_day, so we set manually the values of gregorian_proleptic to 365_day
+    subset = ((df[('GLOBALS', '_DRS_Dmodel')] == 'CCCma-CanESM2') &
+              (df[('GLOBALS', '_DRS_Dexperiment')] == 'historical') &
+              (df[('GLOBALS', '_DRS_Ddomain')] == 'NAM-44') &
+              (df[('GLOBALS', '_DRS_Dfrequency')] == 'day') &
+              (df[('GLOBALS', '_DRS_period')].str.split('-').str.get(0) == "19500101") &
+              (df[('time', 'calendar')] == 'proleptic_gregorian'))
+    df.loc[subset, ('time', 'calendar')] = '365_day'
+
+    df = esgf.fix_time_values(df, group_latest_versions)
 
     for dataset in esgf.group(df, group_time, group_fx):
         D = dict(dataset[dataset[('GLOBALS', '_DRS_Dfrequency')] != 'fx']['GLOBALS'].iloc[0])

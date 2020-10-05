@@ -5,6 +5,7 @@ import sys
 import re
 import pandas as pd
 from jinja2 import Environment, FileSystemLoader, ChoiceLoader, select_autoescape
+import traceback
 
 _help = '''Usage:
    jdataset.py [options]  DATAFRAME...
@@ -42,14 +43,18 @@ def setup_jinja(templates):
     return env
 
 def render(df, dest, **kwargs):
-    d = dict(df['GLOBALS'].iloc[0])
-    path = os.path.abspath(args['dest'].format(**d))
+    try:
+        d = dict(df['GLOBALS'].iloc[0])
+        path = os.path.abspath(args['dest'].format(**d))
 
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, 'w+') as fh:
-        fh.write(template.render({**kwargs, 'df': df}))
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w+') as fh:
+            fh.write(template.render({**kwargs, 'df': df}))
 
-    print(path)
+        print(path)
+    except Exception as err:
+        print('Error: Could not render NcML {0}, caused by {1}'.format(path, err), file=sys.stderr)
+        traceback.print_exc()
 
 if __name__ == '__main__':
     current_abspath = os.path.abspath(os.getcwd())
