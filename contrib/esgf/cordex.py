@@ -164,6 +164,17 @@ if __name__ == '__main__':
               (df[('time', 'calendar')] == 'proleptic_gregorian'))
     df.loc[subset, ('time', 'calendar')] = '365_day'
 
+    # ncs from NAM-44_MOHC-HadGEM2-ES_rcp85_r1i1p1_NCAR-WRF_v3-5-1 end at 10:30 instead
+    # of 12:00, fix manually last time step
+    # not an error but climate4r uses time in seconds to detect daily data (I think)
+    last_time_value = df[('time', 'values')].apply(lambda a: a[-1] if len(a) > 0 else -1)
+    subset = ((df[('GLOBALS', '_DRS_Dmodel')] == 'MOHC-HadGEM2-ES') &
+              (df[('GLOBALS', '_DRS_Dfrequency')] == 'day') &
+              (df[('GLOBALS', '_DRS_Ddomain')] == 'NAM-44') &
+              (last_time_value.apply(lambda x: (x - np.trunc(x)) != .5)))
+    df.loc[subset, ('time', 'values')] = (df.loc[subset, ('time', 'values')]
+                                            .apply(lambda a: np.trunc(a) + .5))
+
     df = esgf.fix_time_values(df, group_latest_versions)
 
     for dataset in esgf.group(df, group_time, group_fx):

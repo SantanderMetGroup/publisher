@@ -16,7 +16,6 @@ Options:
     -o KEY=VALUE                    Each KEY=VALUE will be available to the template as variable KEY.
 
     -t, --template TEMPLATE         Template to use.
-    --templates TEMPLATES           Additional directory to look for templates (default is os.getcwd()).
 '''
 
 def setup_jinja(templates):
@@ -60,7 +59,6 @@ if __name__ == '__main__':
     current_abspath = os.path.abspath(os.getcwd())
     args = {
         'dest': os.path.join(current_abspath, 'unnamed.ncml'),
-        'templates': os.getcwd(),
         'template': 'basic.ncml.j2',
         'opts': {},
         'dfs': [],
@@ -75,9 +73,6 @@ if __name__ == '__main__':
             sys.exit(1)
         elif sys.argv[position] == '-t' or sys.argv[position] == '--template':
             args['template'] = sys.argv[position+1]
-            position+=2
-        elif sys.argv[position] == '--templates':
-            args['templates'] = sys.argv[position+1]
             position+=2
         elif sys.argv[position] == '-d' or sys.argv[position] == '--dest':
             args['dest'] = sys.argv[position+1]
@@ -100,8 +95,9 @@ if __name__ == '__main__':
         print(_help)
         sys.exit(1)
 
-    env = setup_jinja(args['templates'])
-    template = env.get_template(args['template'])
+    template_abs_path = os.path.abspath(args['template'])
+    env = setup_jinja(os.path.dirname(template_abs_path))
+    template = env.get_template(os.path.basename(args['template']))
 
     for arg_df in args['dfs']:
         if not os.path.isfile(arg_df):

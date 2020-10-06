@@ -64,6 +64,12 @@ def fix_time_values(df, facets):
     # them start from the same reference
     how_to_group = [('GLOBALS', f) for f in facets]
     no_fx = df[('GLOBALS', '_DRS_Dfrequency')] != 'fx'
+
+    # Convert empty arrays to string
+    fx = df[('GLOBALS', '_DRS_Dfrequency')] == 'fx'
+    df.loc[fx, ('time', 'values')] = ''
+
+    # Convert non empty arrays to string
     for group_name, group in df[no_fx].groupby(how_to_group):
         i = ('GLOBALS', 'period1')
         reference = group.sort_values(i).iloc[0]
