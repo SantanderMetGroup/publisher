@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 import os, sys
+import re
+import numpy as np
 import pandas as pd
 import netCDF4
 
@@ -8,19 +10,20 @@ _help = '''Usage:
     todf [options] DATAFRAME
 
 Options:
-    -f, --file FILE         Read from FILE instead of stdin.
-    -h, --help              Display this message and exit.
-    -n, --name NAME         Name the dataframe with name NAME (default is '').
-    -g, --groupby GROUP     Comma separated names of columns to groupby under GLOBALS.
+    -f, --file FILE             Read from FILE instead of stdin.
+    -h, --help                  Display this message and exit.
+    -g, --groupby GROUP         Comma separated names of columns to groupby under GLOBALS.
 
-    --drs DRS               Comma separated facets for components of DRS.
-                            Note that the file extension is removed when processing the DRS.
-    --drs-sep SEP           Regular expression separator for --drs (default is '[/_]',
-                            that means split by '_' and '/').
-    --drs-prefix PREFIX     Prefix to be prepended to facets in --drs (default is '_DRS').
+    --facets                    Comma separated facets for components of DRS.
+    --facets-numeric            Comma separated facets from --facets that are numeric.
+    --drs                       Regex to be compiled and searched for facets.
+    --drs-prefix PREFIX         Prefix to be prepended to facets in --drs (default is '_DRS_').
+
+    -v, --variables VARIABLE    Comma separated variables to read values from.
+    --variables-column PREFIX   Name of variable column values (default is '_values').
 '''
 
-def read(files):
+def read(files, variables, variable_column):
     for f in files:
         try:
             attrs = {}
@@ -37,19 +40,17 @@ def read(files):
                     for attr in ds[variable].ncattrs():
                         attrs[(variable, attr)] = ds[variable].getncattr(attr)
 
+                    # Read variable values
+                    if variable in variables:
+                        a = np.array(ds.variables[variable])
+                        attrs[(variable, variable_column)] = a
+
                 for dimension in ds.dimensions:
                     name = ds.dimensions[dimension].name
                     size = ds.dimensions[dimension].size
                     attrs[('_'.join(['_d', dimension]), 'name')] = name
                     attrs[('_'.join(['_d', dimension]), 'size')] = size
     
-                # This is so often required that it's fair to include it here
-                # Just be careful about overwriting existing attributes
-                if 'time' in ds.variables and ds.variables['time'].size > 1:
-                    attrs[('time', 'ncoords')] = ds.variables['time'].size
-                    attrs[('time', 'value0')] = ds.variables['time'][0]
-                    attrs[('time', 'increment')] = ds.variables['time'][1] - ds.variables['time'][0]
-        
             yield attrs
         except Exception as err:
             print("Error while reading netCDF file {0}".format(f), file=sys.stderr)
@@ -59,10 +60,13 @@ def args(argv):
     args = {
         'file': None,
         'dest': 'unnamed.hdf',
-        'name': '',
         'groupby': None,
         'drs': None,
-        'drs_sep': '[/_]',
+        'facets': None,
+        'facets_numeric': None,
+        'drs_prefix': '_DRS_',
+        'variables': [],
+        'variables_column': '_values',
     }
 
     position = 1
@@ -78,9 +82,6 @@ def args(argv):
         elif argv[position] == '-f' or argv[position] == '--file':
             args['file'] = argv[position+1]
             position+=2
-        elif argv[position] == '-n' or argv[position] == '--name':
-            args['name'] = argv[position+1]
-            position+=2
         elif argv[position] == '-g' or argv[position] == '--groupby':
             fs = argv[position+1]
             args['groupby'] = [('GLOBALS', f) for f in fs.split(',')]
@@ -88,11 +89,20 @@ def args(argv):
         elif argv[position] == '--drs':
             args['drs'] = argv[position+1]
             position+=2
-        elif argv[position] == '--drs-sep':
-            args['drs_sep'] = argv[position+1]
+        elif argv[position] == '--facets':
+            args['facets'] = argv[position+1]
+            position+=2
+        elif argv[position] == '--facets-numeric':
+            args['facets_numeric'] = argv[position+1]
             position+=2
         elif argv[position] == '--drs-prefix':
-            args['drs_sep'] = argv[position+1]
+            args['drs_prefix'] = argv[position+1]
+            position+=2
+        elif argv[position] == '-v' or argv[position] == '--variables':
+            args['variables'] = argv[position+1].split(',')
+            position+=2
+        elif argv[position] == '--variables-column':
+            args['variables_column'] = argv[position+1]
             position+=2
         else:
             args['dest'] = argv[position]
@@ -104,32 +114,41 @@ if __name__ == '__main__':
     args = args(sys.argv)
 
     if args['file'] is None:
-        df = pd.DataFrame(read(sys.stdin.read().splitlines()))
+        df = pd.DataFrame(read(sys.stdin.read().splitlines(),
+                               args['variables'],
+                               args['variables_column']))
     else:
-        df = pd.DataFrame(read(args['file'].read().splitlines()))
+        df = pd.DataFrame(read(args['file'].read().splitlines(),
+                               args['variables'],
+                               args['variables_column']))
 
     if len(df) == 0:
         print('Empty DataFrame, exiting...')
         sys.exit(1)
 
     df.columns = pd.MultiIndex.from_tuples(df.columns)
-    df.name = args['name']
 
     if args['drs'] is not None:
-        drs = args['drs'].split(',')
-        ndrs = len(drs)
-        localpaths = df[('GLOBALS', 'localpath')].apply(lambda x: os.path.splitext(x)[0])
-        drs_df = localpaths.str.split(args['drs_sep'], expand=True).iloc[:, -ndrs:]
-        drs_df.columns = [('GLOBALS', '_'.join(['_DRS', f])) for f in drs]
+        facets = args['facets'].split(',')
+
+        p = re.compile(args['drs'])
+        matches = df[('GLOBALS', 'localpath')].str.match(p)
+        if not matches.all():
+            print('Some input files do not match regex, exiting...')
+            sys.exit(1)
+
+        drs_df = df[('GLOBALS', 'localpath')].str.extract(p)
+        drs_df.columns = [('GLOBALS', ''.join([args['drs_prefix'], f])) for f in facets]
+
+        # Convert numeric DRS columns from object to numeric
+        if args['facets_numeric']:
+            facets_numeric = args['facets_numeric'].split(',')
+            facets_numeric = [('GLOBALS', ''.join([args['drs_prefix'], f])) for f in facets_numeric]
+
+            for f in facets_numeric:
+                drs_df[f] = pd.to_numeric(drs_df[f])
+
         df = pd.concat([df, drs_df], axis=1)
-
-# https://github.com/pandas-dev/pandas/issues/31199
-#    # transform object columns to string
-#    object_columns = df.select_dtypes(include=['object']).columns
-#    df[object_columns] = df[object_columns].astype('string')
-    import warnings
-    warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
-
 
     if args['groupby'] is not None:
         for n,g in df.groupby(args['groupby']):
