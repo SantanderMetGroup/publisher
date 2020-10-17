@@ -153,13 +153,15 @@ if __name__ == '__main__':
     if args['groupby'] is not None:
         for n,g in df.groupby(args['groupby']):
             D = dict(g.iloc[0]['GLOBALS'])
-            dest = args['dest'].format(**D)
+            dest = os.path.abspath(args['dest'].format(**D))
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
             with pd.HDFStore(dest) as store:
                 store['df'] = g
             print(dest)
     else:
         D = dict(df.iloc[0]['GLOBALS'])
-        dest = args['dest'].format(**D)
+        dest = os.path.abspath(args['dest'].format(**D))
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
         with pd.HDFStore(dest) as store:
             store['df'] = df
         print(dest)

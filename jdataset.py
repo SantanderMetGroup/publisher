@@ -3,6 +3,7 @@
 import os
 import sys
 import re
+import numpy as np
 import pandas as pd
 from jinja2 import Environment, FileSystemLoader, ChoiceLoader, select_autoescape
 import traceback
@@ -17,6 +18,12 @@ Options:
 
     -t, --template TEMPLATE         Template to use.
 '''
+
+def _values(series, sep=None):
+    if sep is None:
+        sep = ' '
+
+    return series.apply(lambda a: sep.join(np.ravel(a).astype(str)))
 
 def setup_jinja(templates):
     default_templates = os.path.join(os.path.dirname(__file__), 'templates')
@@ -35,6 +42,8 @@ def setup_jinja(templates):
     env.filters['basename'] = lambda path: os.path.basename(path)
     env.filters['dirname'] = lambda path: os.path.dirname(path)
     env.filters['regex_replace'] = lambda s, find, replace: re.sub(find, replace, s)
+
+    env.filters['_values'] = _values
 
     env.tests['isncml'] = lambda dataset: dataset['ext'] == ".ncml"
     env.tests['isnc'] = lambda dataset: dataset['ext'] != ".ncml"
