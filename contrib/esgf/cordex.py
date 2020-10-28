@@ -55,7 +55,7 @@ Options:
 
 def parse_args(argv):
     args = {
-        'dest': os.path.join(os.getcwd(), '{_drs_filename}.hdf'),
+        'dest': os.path.join(os.getcwd(), 'unnamed.hdf'),
         'variable_col': '_DRS_variable',
         'latest': None,
         'group_time': 'project_id,product,CORDEX_domain,institute_id,driving_model_id,experiment_id,driving_model_ensemble_member,model_id,rcm_version_id,frequency',
@@ -153,9 +153,20 @@ if __name__ == '__main__':
     subset = ((df[('GLOBALS', '_DRS_Dfrequency')] == 'day') &
               (df[('GLOBALS', '_DRS_Ddomain')].str.match('NAM-44|NAM-22')) &
               (time_diff))
-    df.loc[subset, ('time', '_values')] = (df.loc[subset, ('time', '_values')]
-                                            .apply(lambda a: np.arange(a[0], a[0]+len(a))))
+    df.loc[subset, ('time', '_values')] = (
+        df.loc[subset, ('time', '_values')].apply(lambda a: np.arange(a[0], a[0]+len(a))))
 
+    # AFR data with rotated_pole:grid_north_pole_longitude == -180. set to 0
+    rotated_grids = ([
+        ('rotated_pole', 'grid_north_pole_longitude'),
+        ('rotated_latitude_longitude', 'grid_north_pole_longitude')])
+    for grid_north_pole_longitude in rotated_grids:
+        if grid_north_pole_longitude in df.columns:
+            subset = (((df[grid_north_pole_longitude] == -180.0) | (df[grid_north_pole_longitude] == 180.0)) &
+                       df[('GLOBALS', '_DRS_Ddomain')].str.match('AFR-'))
+            df.loc[subset, grid_north_pole_longitude] = 0
+
+    # Set same calendar for time values
     df = esgf.fix_time_values(df, args['group_time'], args['variable_col'])
 
     how_to_group = [('GLOBALS', facet) for facet in args['group_time'].split(',')]
