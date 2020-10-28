@@ -3,6 +3,7 @@
 import os
 import sys
 import re
+import numpy as np
 import pandas as pd
 
 import esgf
@@ -17,6 +18,8 @@ Options:
 
     --group-time FACETS             Comma separated facets that group time periods of variables.
     --group-fx FACETS               Comma separated facets that, given a group grouped by --group-time, return it's fxs.
+
+    --lon-180                       Convert lon coordinate from [0,360) to [-180,180).
 '''
 
 group_latest_versions = (['_DRS_Dproject', '_DRS_Dproduct','_DRS_Dinstitution',
@@ -61,6 +64,7 @@ def arguments(argv):
         'variable_col': '_DRS_variable',
         'group_time': 'project_id,product,institute_id,model_id,experiment_id,frequency,modeling_realm,parent_experiment_rip',
         'group_fx': 'project_id,product,institute_id,model_id,experiment_id,modeling_realm',
+        'lon_180': False,
         'dataframe': None,
     }
 
@@ -82,6 +86,9 @@ def arguments(argv):
         elif argv[position] == '--group-fx':
             args['group_fx'] = argv[position+1]
             position+=2
+        elif argv[position] == '--lon-180':
+            args['lon_180'] = True
+            position+=1
         else:
             args['dataframe'] = argv[position]
             position+=1
@@ -111,10 +118,18 @@ if __name__ == '__main__':
         df[('GLOBALS', 'nversion')] = df[('GLOBALS', '_DRS_version')].str.replace('[a-zA-Z]', '').astype(int)
         df = esgf.get_latest_versions(df, group_latest_versions)
 
+    if args['lon_180']:
+        if ('lon', '_values') in df.columns:
+            df[('lon', '_values')] = df[('lon', '_values')].apply(
+                lambda a: np.where(a>=180, a-360, a)).apply(
+                lambda a: np.sort(a))
+        if ('lon_bnds', '_values') in df.columns:
+            nans = df[('lon_bnds', '_values')].isna()
+            df.loc[~nans, ('lon_bnds', '_values')] = df.loc[~nans, ('lon_bnds', '_values')].apply(
+                lambda a: np.sort(np.ravel(a-180)))
+
     subset = df[('GLOBALS', '_DRS_period')].isna()
-    df = esgf.fix_time_values(df, args['group_time'].split(','), args['variable_col'])
-    df.loc[~subset, ('time', '_values_str')] = df.loc[~subset, ('time', '_values')].apply(
-            lambda times: ' '.join(times.astype(str)))
+    df = esgf.fix_time_values(df, args['group_time'], args['variable_col'])
 
     how_to_group = [('GLOBALS', facet) for facet in args['group_time'].split(',')]
     time_groups = df[~df[('GLOBALS', args['variable_col'])].isin(esgf.vars_fx)].groupby(how_to_group)
@@ -138,13 +153,6 @@ if __name__ == '__main__':
             synthetic_facet = '_synthetic_' + facet
             dataset[('GLOBALS', synthetic_facet)] = d[facet]
 
-        D = dict(dataset[~dataset[('GLOBALS', args['variable_col'])].isin(esgf.vars_fx)]['GLOBALS'].iloc[0])
-        #drs_directory = ddrs.format(**D)
-        drs_filename = fdrs.format(**D).replace(" ", "-")
-        #dataset.name = os.path.join(drs_directory, drs_filename)
-        #dataset[('GLOBALS', '_drs')] = dataset.name
-        #dataset[('GLOBALS', '_drs_directory')] = drs_directory
-        dataset[('GLOBALS', '_drs_filename')] = drs_filename
         D = dict(dataset[~dataset[('GLOBALS', args['variable_col'])].isin(esgf.vars_fx)]['GLOBALS'].iloc[0])
         path = os.path.abspath(args['dest'].format(**D))
 
