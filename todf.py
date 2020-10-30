@@ -123,7 +123,7 @@ if __name__ == '__main__':
                                args['variables_column']))
 
     if len(df) == 0:
-        print('Empty DataFrame, exiting...')
+        print('Empty DataFrame, exiting...', file=sys.stderr)
         sys.exit(1)
 
     df.columns = pd.MultiIndex.from_tuples(df.columns)
