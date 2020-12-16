@@ -12,6 +12,15 @@ vars_fx = (['areacella', 'areacello', 'areacellr', 'basin',
            'orog', 'orograw', 'rootd', 'sftgif', 'sftlf',
            'sftof', 'thkcello', 'volcello', 'zfull'])
 
+def time_same_coordinate(df, variable_col, time_values_col):
+    times = df.groupby([variable_col]).apply(
+        lambda g: g[time_values_col]).groupby(level=0).apply(
+        lambda g: np.sort(np.concatenate(g)))
+    times0 = times.iloc[0]
+    timesd = {variable: np.array_equal(times0, a) for variable,a in times.iteritems()}
+
+    return df[variable_col].map(timesd)
+
 def render(df, dest):
     os.makedirs(os.path.dirname(dest), exist_ok=True)
 
@@ -59,7 +68,7 @@ def get_latest_versions(df, facets, version_column):
 
     if len(no_latest_versions) > 0:
         # Need to do this in case more than two versions exist
-        latest_no_latest_versions = get_latest_versions(no_latest_versions, facets)
+        latest_no_latest_versions = get_latest_versions(no_latest_versions, facets, version_column)
 
         # Drop filename that already exist in newer versions
         to_be_added = latest_no_latest_versions[~latest_no_latest_versions[('GLOBALS', 'filename')].isin(latest_versions[('GLOBALS', 'filename')])]
