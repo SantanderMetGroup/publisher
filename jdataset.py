@@ -114,10 +114,9 @@ if __name__ == '__main__':
             sys.exit(1)
 
     for arg_df in args['dfs']:
-        with pd.HDFStore(arg_df) as store:
-            df = store['df']
-            if args['groupby'] is not None:
-                for _,g in df.groupby(args['groupby']):
-                    render(g, args['dest'], **args['opts'])
-            else:
-                render(df, args['dest'], **args['opts'])
+        df = pd.read_pickle(arg_df)
+        if args['groupby'] is not None:
+            for _,g in df.groupby(args['groupby']):
+                render(g, args['dest'], **args['opts'])
+        else:
+            render(df, args['dest'], **args['opts'])

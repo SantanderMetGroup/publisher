@@ -48,6 +48,8 @@ def fix_time_values(df, facets, variable_col):
             cftime.num2date(row[('time', '_values')], row[('time', 'units')], row[('time', 'calendar')]), axis=1)
         df.loc[group.index, ('time', '_values')] = cftimes.apply(
             lambda dates: cftime.date2num(dates, reference_units, reference_calendar))
+        df.loc[group.index, ('time', 'calendar')] = reference_calendar
+        df.loc[group.index, ('time', 'units')] = reference_units
 
     return df
 

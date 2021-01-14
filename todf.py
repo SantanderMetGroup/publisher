@@ -162,6 +162,5 @@ if __name__ == '__main__':
         D = dict(df.iloc[0]['GLOBALS'])
         dest = os.path.abspath(args['dest'].format(**D))
         os.makedirs(os.path.dirname(dest), exist_ok=True)
-        with pd.HDFStore(dest) as store:
-            store['df'] = df
+        df.to_pickle(dest)
         print(dest)
