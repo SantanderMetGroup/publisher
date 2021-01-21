@@ -27,9 +27,7 @@ def render(df, dest):
     import warnings
     warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 
-    store = pd.HDFStore(dest)
-    store['df'] = df
-    store.close()
+    df.to_pickle(dest)
 
     return dest
 
