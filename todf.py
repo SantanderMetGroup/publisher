@@ -27,8 +27,13 @@ def read(files, variables, variable_column):
     for f in files:
         try:
             attrs = {}
-            attrs[('GLOBALS', 'size')] = os.stat(f).st_size
-            attrs[('GLOBALS', 'localpath')] = os.path.abspath(f)
+
+            # f is a file in file system or a url
+            if os.path.exists(f):
+                attrs[('GLOBALS', 'size')] = os.stat(f).st_size
+                attrs[('GLOBALS', 'localpath')] = os.path.abspath(f)
+            else:
+                attrs[('GLOBALS', 'localpath')] = f
         
             with netCDF4.Dataset(f) as ds:
                 for attr in ds.ncattrs():
@@ -55,6 +60,25 @@ def read(files, variables, variable_column):
         except Exception as err:
             print("Error while reading netCDF file {0}".format(f), file=sys.stderr)
             print("Error: {0}".format(err), file=sys.stderr)
+
+def include_drs(df, drs, drs_facets, drs_prefix, facets_numeric):
+    p = re.compile(drs)
+    matches = df[('GLOBALS', 'localpath')].str.match(p)
+    if not matches.all():
+        print('Some input files do not match regex, exiting...', file=sys.stderr)
+        sys.exit(1)
+
+    drs_df = df[('GLOBALS', 'localpath')].str.extract(p)
+    drs_df.columns = [('GLOBALS', ''.join([drs_prefix, f])) for f in drs_facets]
+
+    # Convert numeric DRS columns from object to numeric
+    if facets_numeric:
+        facets_numeric = [('GLOBALS', ''.join([drs_prefix, f])) for f in facets_numeric]
+
+        for f in facets_numeric:
+            drs_df[f] = pd.to_numeric(drs_df[f])
+
+    return pd.concat([df, drs_df], axis=1)
 
 def args(argv):
     args = {
@@ -114,13 +138,11 @@ if __name__ == '__main__':
     args = args(sys.argv)
 
     if args['file'] is None:
-        df = pd.DataFrame(read(sys.stdin.read().splitlines(),
-                               args['variables'],
-                               args['variables_column']))
+        df = pd.DataFrame(read(sys.stdin.read().splitlines(), args['variables'], args['variables_column']))
     else:
-        df = pd.DataFrame(read(args['file'].read().splitlines(),
-                               args['variables'],
-                               args['variables_column']))
+        inputs = open(args['file'], 'r')
+        df = pd.DataFrame(read(inputs, args['variables'], args['variables_column']))
+        inputs.close()
 
     if len(df) == 0:
         print('Empty DataFrame, exiting...', file=sys.stderr)
@@ -129,26 +151,11 @@ if __name__ == '__main__':
     df.columns = pd.MultiIndex.from_tuples(df.columns)
 
     if args['drs'] is not None:
-        facets = args['facets'].split(',')
-
-        p = re.compile(args['drs'])
-        matches = df[('GLOBALS', 'localpath')].str.match(p)
-        if not matches.all():
-            print('Some input files do not match regex, exiting...')
-            sys.exit(1)
-
-        drs_df = df[('GLOBALS', 'localpath')].str.extract(p)
-        drs_df.columns = [('GLOBALS', ''.join([args['drs_prefix'], f])) for f in facets]
-
-        # Convert numeric DRS columns from object to numeric
-        if args['facets_numeric']:
-            facets_numeric = args['facets_numeric'].split(',')
-            facets_numeric = [('GLOBALS', ''.join([args['drs_prefix'], f])) for f in facets_numeric]
-
-            for f in facets_numeric:
-                drs_df[f] = pd.to_numeric(drs_df[f])
-
-        df = pd.concat([df, drs_df], axis=1)
+        df = include_drs(df,
+                         args['drs'],
+                         args['facets'].split(','),
+                         args['drs_prefix'],
+                         args['facets_numeric'].split(','))
 
     if args['groupby'] is not None:
         for n,g in df.groupby(args['groupby']):
