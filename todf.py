@@ -14,9 +14,9 @@ Options:
     -h, --help                  Display this message and exit.
     -g, --groupby GROUP         Comma separated names of columns to groupby under GLOBALS.
 
-    --facets                    Comma separated facets for components of DRS.
-    --facets-numeric            Comma separated facets from --facets that are numeric.
-    --drs                       Regex to be compiled and searched for facets.
+    --facets FACES              Comma separated facets for components of DRS.
+    --facets-numeric FACETS     Comma separated facets from --facets that are numeric.
+    --drs DRS                   Regex to be compiled and searched for facets.
     --drs-prefix PREFIX         Prefix to be prepended to facets in --drs (default is '_DRS_').
 
     -v, --variables VARIABLE    Comma separated variables to read values from.
@@ -140,7 +140,8 @@ if __name__ == '__main__':
     if args['file'] is None:
         df = pd.DataFrame(read(sys.stdin.read().splitlines(), args['variables'], args['variables_column']))
     else:
-        inputs = open(args['file'], 'r')
+        f = open(args['file'], 'r')
+        inputs = (line.rstrip('\n') for line in f)
         df = pd.DataFrame(read(inputs, args['variables'], args['variables_column']))
         inputs.close()
 
