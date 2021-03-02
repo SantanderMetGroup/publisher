@@ -73,7 +73,7 @@ def include_drs(df, drs, drs_facets, drs_prefix, facets_numeric):
 
     # Convert numeric DRS columns from object to numeric
     if facets_numeric:
-        facets_numeric = [('GLOBALS', ''.join([drs_prefix, f])) for f in facets_numeric]
+        facets_numeric = [('GLOBALS', ''.join([drs_prefix, f])) for f in facets_numeric.split(',')]
 
         for f in facets_numeric:
             drs_df[f] = pd.to_numeric(drs_df[f])
@@ -156,7 +156,7 @@ if __name__ == '__main__':
                          args['drs'],
                          args['facets'].split(','),
                          args['drs_prefix'],
-                         args['facets_numeric'].split(','))
+                         args['facets_numeric'])
 
     if args['groupby'] is not None:
         for n,g in df.groupby(args['groupby']):
