@@ -39,8 +39,9 @@ def f_timeunitschange(df, timecol=None, units=None, calendar=None):
         cftime.num2date(row[(timecol, '_values')], row[(timecol, 'units')], row[(timecol, 'calendar')]), axis=1)
     df[(timecol, '_values')] = df.apply(lambda row:
         cftime.date2num(row[(timecol, '_values')], units, calendar), axis=1)
-    df[(timecol, 'units')] = units
-    df[(timecol, 'calendar')] = calendar
+
+#    df[(timecol, 'units')] = units
+#    df[(timecol, 'calendar')] = calendar
 
     return df
 

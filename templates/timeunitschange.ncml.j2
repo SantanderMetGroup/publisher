@@ -10,7 +10,9 @@
                 <variable name="time_{{ variable }}" orgName="time">
                     <attribute name="units" value="{{ variable_group.iloc[0][('time', 'units')] }}"/>
                     <attribute name="calendar" value="{{ variable_group.iloc[0][('time', 'calendar')] }}"/>
+                    {% if (variable_group[('time', 'units')].unique())|length > 1 %}
                     <values>{{ rowdata[('time', '_values')]|join(' ') }}</values>
+                    {% endif %}
                 </variable>
                 {% if ('height', 'standard_name') in rowdata.index and rowdata[('height', 'standard_name')] == 'height' %}
                 <!-- height is variable dependent -->
