@@ -83,7 +83,7 @@ def include_drs(df, drs, drs_facets, drs_prefix, facets_numeric):
 def args(argv):
     args = {
         'file': None,
-        'dest': 'unnamed.hdf',
+        'dest': 'unnamed.pickle',
         'groupby': None,
         'drs': None,
         'facets': None,

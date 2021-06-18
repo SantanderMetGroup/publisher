@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <netcdf xmlns="http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2">
-  <attribute name="primary_variables" value="{{ ','.join(df[('GLOBALS', variable_col)].unique()) }}"/>
-  <attribute name="size" type="int" value="{{ df[('GLOBALS', 'size')].sum()|int }}" />
-  <attribute name="size_human" value="{{ df[('GLOBALS', 'size')].sum()|filesizeformat(binary=True) }}" />
-
   <aggregation type="union">
     {% for variable,variable_group in df.sort_values(by=[('GLOBALS', variable_col), ('GLOBALS', 'localpath')]).groupby(('GLOBALS', variable_col)) %}
     <netcdf>
         <aggregation type="joinExisting" dimName="time_{{ variable }}">
-            {% for rowindex,rowdata in variable_group.iterrows() %}
+            {% for rowindex,rowdata in (variable_group|timeunitschange).iterrows() %}
             <netcdf location="{{ rowdata[('GLOBALS', 'localpath')].strip('\n') }}" ncoords="{{ rowdata[('_d_time', 'size')] }}">
                 <dimension name="time_{{ variable }}" orgName="time" isUnlimited="false"/>
-                <variable name="time_{{ variable }}" orgName="time"/>
+                <variable name="time_{{ variable }}" orgName="time">
+                    <attribute name="units" value="{{ variable_group.iloc[0][('time', 'units')] }}"/>
+                    <attribute name="calendar" value="{{ variable_group.iloc[0][('time', 'calendar')] }}"/>
+                    <values>{{ rowdata[('time', '_values')]|join(' ') }}</values>
+                </variable>
                 {% if ('height', 'standard_name') in rowdata.index and rowdata[('height', 'standard_name')] == 'height' %}
                 <!-- height is variable dependent -->
                 <variable name="height_{{ variable }}" orgName="height"/>

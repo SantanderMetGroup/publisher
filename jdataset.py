@@ -3,6 +3,7 @@
 import os
 import sys
 import re
+import cftime
 import numpy as np
 import pandas as pd
 from jinja2 import Environment, FileSystemLoader, ChoiceLoader, select_autoescape
@@ -19,12 +20,31 @@ Options:
     -t, --template TEMPLATE         Template to use.
 '''
 
-def _values(series, sep=None):
+# filters
+def f_values(series, sep=None):
     if sep is None:
         sep = ' '
 
     return series.apply(lambda a: sep.join(np.ravel(a).astype(str)))
 
+def f_timeunitschange(df, timecol=None, units=None, calendar=None):
+    if timecol is None:
+        timecol = 'time'
+    if units is None:
+        units = df[(timecol, 'units')].iloc[0]
+    if calendar is None:
+        calendar = df[(timecol, 'calendar')].iloc[0]
+
+    df[(timecol, '_values')] = df.apply(lambda row:
+        cftime.num2date(row[(timecol, '_values')], row[(timecol, 'units')], row[(timecol, 'calendar')]), axis=1)
+    df[(timecol, '_values')] = df.apply(lambda row:
+        cftime.date2num(row[(timecol, '_values')], units, calendar), axis=1)
+    df[(timecol, 'units')] = units
+    df[(timecol, 'calendar')] = calendar
+
+    return df
+
+# non filter functions
 def setup_jinja(templates):
     default_templates = os.path.join(os.path.dirname(__file__), 'templates')
     loader = ChoiceLoader([
@@ -43,7 +63,8 @@ def setup_jinja(templates):
     env.filters['dirname'] = lambda path: os.path.dirname(path)
     env.filters['regex_replace'] = lambda s, find, replace: re.sub(find, replace, s)
 
-    env.filters['_values'] = _values
+    env.filters['_values'] = f_values
+    env.filters['timeunitschange'] = f_timeunitschange
 
     env.tests['isncml'] = lambda dataset: dataset['ext'] == ".ncml"
     env.tests['isnc'] = lambda dataset: dataset['ext'] != ".ncml"
