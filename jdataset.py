@@ -69,6 +69,7 @@ def setup_jinja(templates):
 
     env.tests['isncml'] = lambda dataset: dataset['ext'] == ".ncml"
     env.tests['isnc'] = lambda dataset: dataset['ext'] != ".ncml"
+    env.tests['onestep'] = lambda arr: len(np.unique(np.diff(arr))) == 1
 
     return env
 
