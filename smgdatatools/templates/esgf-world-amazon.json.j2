@@ -1,0 +1,101 @@
+{
+    ".zgroup": "{\"zarr_format\": 2}",
+
+    {% set ensembles = stores|map("attr", "attrs")|sum(start=[])|selectattr("name", "eq", "variant_label")|map("attr", "value")|unique|sort|list|to_numpy %}
+    {% set proto_store = stores[0] %}
+    {% set time = "time" %}
+    {% set time_bounds = stores[0].variables|selectattr("name", "eq", time)|first|attr("attrs")|selectattr("name", "eq", "bounds")|first|attr("value") %}
+    {% set dimensions = stores|map("attr", "variables")|sum(start=[])|select("is_dimension")|map("attr", "name")|unique|list %}
+
+    {% set proto_stores = stores|map("attr", "variables")|sum(start=[])|selectattr("name", "eq", aggregations[0])|map("attr", "store")|list %}
+    {% set time_stores = proto_stores|map("attr", "attrs")|sum(start=[])|selectattr("name", "eq", "variant_label")|selectattr("value", "eq", ensembles[0])|map("attr", "store")|map("attr", "variables")|sum(start=[])|selectattr("name", "eq", time)|map("attr", "store")|list %}
+
+    "variant_label/.zarray": "{\"chunks\":{{ ensembles.shape|list }},\"compressor\":null,\"dtype\":\"{{ ensembles.dtype }}\",\"fill_value\":null,\"filters\":[],\"order\":\"C\",\"shape\":{{ ensembles.shape|list }},\"zarr_format\":2}",
+    "variant_label/.zattrs": "{\"_ARRAY_DIMENSIONS\":[\"variant_label\"],\"standard_name\":\"realization\",\"_CoordinateAxisType\":\"Ensemble\"}",
+    "variant_label/0": "base64:{{ (ensembles|b64encode).decode('ascii') }}",
+
+    {% for v in proto_store.variables %}
+    {% if v.name != time and v.name != time_bounds and not v.name in aggregations and not v.name in dimensions %}
+    {% set shape = v.dimensions|map("attr", "size")|list %}
+    {% set chunks = v.dimensions|map("attr", "chunk_shapes")|sum(start=[])|sort(attribute="index")|map("attr", "shape")|list %}
+    {% set attributes = v.attrs|attrs_dict %}
+    {% set scales = ",".join(v.scales|map("attr", "name")|map("regex_replace", "^", "\\\"")|map("regex_replace", "$", "\\\"")) %}
+    "{{ v.name }}/.zarray": "{\"chunks\":{{ chunks }},\"compressor\":null,\"dtype\":\"{{ v.dtype }}\",\"fill_value\":{{ v.fill_value|default("null", true) }},\"filters\":[{% for f in v.filters %}{\"elementsize\":{{ f.elementsize }},\"id\":\"{{ f.name }}\"}{% endfor %}],\"order\":\"C\",\"shape\":{{ shape }},\"zarr_format\":2}",
+    {% if attributes %}
+    "{{ v.name }}/.zattrs": "{\"_ARRAY_DIMENSIONS\":[{{ scales }}],{{ attributes.items()|attrs_escape|join(", ") }}}",
+    {% else %}
+    "{{ v.name }}/.zattrs": "{\"_ARRAY_DIMENSIONS\":[{{ scales }}]}",
+    {% endif %}
+    {% endif %}
+    {% endfor %}
+
+    {# time and time bounds #}
+    {% for t in [time, time_bounds] %}
+    {% set v = proto_store.variables|selectattr("name", "eq", t)|first %}
+    {% set attributes = v.attrs %}
+    {% set aggsize = time_stores|map("attr", "variables")|sum(start=[])|selectattr("name", "eq", aggregations[0])|map("attr", "store")|map("attr", "variables")|sum(start=[])|selectattr("name", "eq", t)|map("attr", "dimensions")|sum(start=[])|selectattr("index", "eq", 0)|map("attr", "size")|sum %}
+    {% set shape = [aggsize] + (v.dimensions|map("attr", "size")|list)[1:] %}
+    {% set chunks = v.dimensions|map("attr", "chunk_shapes")|sum(start=[])|sort(attribute="index")|map("attr", "shape")|list %}
+    {% set attributes = v.attrs|attrs_dict %}
+    {% set scales = ",".join(v.scales|map("attr", "name")|map("regex_replace", "^", "\\\"")|map("regex_replace", "$", "\\\"")) %}
+    "{{ v.name }}/.zarray": "{\"chunks\":{{ chunks }},\"compressor\":null,\"dtype\":\"{{ v.dtype }}\",\"fill_value\":{{ v.fill_value|default("null", true) }},\"filters\":[{% for f in v.chunks[0].filters %}{\"elementsize\":{{ f.elementsize }},\"id\":\"{{ f.name }}\"}{% endfor %}],\"order\":\"C\",\"shape\":{{ shape }},\"zarr_format\":2}",
+    {% if attributes %}
+    "{{ v.name }}/.zattrs": "{\"_ARRAY_DIMENSIONS\":[{{ scales }}],{{ attributes.items()|attrs_escape|join(", ") }}}",
+    {% else %}
+    "{{ v.name }}/.zattrs": "{\"_ARRAY_DIMENSIONS\":[{{ scales }}]}",
+    {% endif %}
+    {% endfor %}
+
+    {# aggregations #}
+    {% for a in aggregations %}
+    {% set v = stores|map("attr", "variables")|sum(start=[])|selectattr("name", "eq", a)|first %}
+    {% set aggsize = time_stores|map("attr", "variables")|sum(start=[])|selectattr("name", "eq", time)|map("attr", "dimensions")|sum(start=[])|selectattr("index", "eq", 0)|map("attr", "size")|sum %}
+    {% set shape = [ensembles|length] + [aggsize] + (v.dimensions|map("attr", "size")|list)[1:] %}
+    {% set chunks = [1] + (v.dimensions|map("attr", "chunk_shapes")|sum(start=[])|sort(attribute="index")|map("attr", "shape")|list) %}
+    {% set attributes = v.attrs|attrs_dict %}
+    {% set scales = '\\"variant_label\\",' + ",".join(v.scales|map("attr", "name")|map("regex_replace", "^", "\\\"")|map("regex_replace", "$", "\\\"")) %}
+    "{{ v.name }}/.zarray": "{\"chunks\":{{ chunks }},\"compressor\":{\"id\":\"{{ v.compressor.name|replace("gzip", "zlib") }}\", \"level\":\"{{ v.compressor.properties|selectattr("name", "eq", "level")|first|attr("value") }}\"},\"dtype\":\"{{ v.dtype }}\",\"fill_value\":{{ v.chunks[0].fillvalue|default("null", true) }},\"filters\":[{% for f in v.chunks[0].filters %}{\"elementsize\":{{ f.elementsize }},\"id\":\"{{ f.name }}\"}{% endfor %}],\"order\":\"C\",\"shape\":{{ shape }},\"zarr_format\":2}",
+    {% if attributes %}
+    "{{ v.name }}/.zattrs": "{\"_ARRAY_DIMENSIONS\":[{{ scales }}],{{ attributes.items()|attrs_escape|join(", ") }}}",
+    {% else %}
+    "{{ v.name }}/.zattrs": "{\"_ARRAY_DIMENSIONS\":[{{ scales }}]}",
+    {% endif %}
+    {% endfor %}
+
+    {% for v in proto_store.variables %}
+    {% if v.name != time and v.name != time_bounds and not v.name in aggregations and not v.name in dimensions %}
+    {% for c in v.chunks %}
+    "{{ v.name }}/{{ v|calculate_chunk_idx(c.index)|map("string")|join(".") }}": [
+        "{{ v.store.name|replace('https://esgf-world.s3.amazonaws.com/', 'esgf-world/') }}", {{ c.location }}, {{ c.size }}
+    ],
+    {% endfor %}
+    {% endif %}
+    {% endfor %}
+
+    {% for t in [time, time_bounds] %}
+    {% set time = time_stores|map("attr", "variables")|sum(start=[])|selectattr("name", "eq", t)|join_existing %}
+    {% for v in time %}
+    {% for c in v.chunks %}
+    "{{ v.name }}/{{ v|calculate_chunk_idx(c.index)|map("string")|join(".") }}": [
+        "{{ v.store.name|replace('https://esgf-world.s3.amazonaws.com/', 'esgf-world/') }}", {{ c.location }}, {{ c.size }}
+    ],
+    {% endfor %}
+    {% endfor %}
+    {% endfor %}
+
+    {% for a in aggregations %}
+    {% for ensemble in ensembles %}
+    {% set i = loop.index %}
+    {% set a_stores = stores|map("attr", "variables")|sum(start=[])|selectattr("name", "eq", a)|map("attr", "store")|list %}
+    {% set ensemble_stores = a_stores|map("attr", "attrs")|sum(start=[])|selectattr("name", "eq", "variant_label")|selectattr("value", "eq", ensemble)|map("attr", "store")|list %}
+    {% set agg = ensemble_stores|map("attr", "variables")|sum(start=[])|selectattr("name", "eq", a)|list|join_existing %}
+    {% for v in agg %}
+    {% for c in v.chunks %}
+    "{{ v.name }}/{{ i - 1 }}.{{ v|calculate_chunk_idx(c.index)|map("string")|join(".") }}": [
+        "{{ v.store.name|replace('https://esgf-world.s3.amazonaws.com/', 'esgf-world/') }}", {{ c.location }}, {{ c.size }}
+    ],
+    {% endfor %}
+    {% endfor %}
+    {% endfor %}
+    {% endfor %}
+}

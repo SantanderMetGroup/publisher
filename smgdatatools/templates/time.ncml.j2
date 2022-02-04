@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<netcdf xmlns="http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2">
+    <attribute name="size" type="int" value="{{ stores|map('attr', 'size')|sum|int }}"/>
+    <attribute name="size_human" value="{{ stores|map('attr', 'size')|sum|filesizeformat(binary=True) }}"/>
+
+    <aggregation type="union">
+        {% for a in aggregations %}
+        {% set subset = stores|map("attr", "variables")|sum(start=[])|selectattr("name", "eq", a)|map("attr", "store")|sort(attribute="name")|unique|list %}
+        {% if subset|length > 0 %}
+        <netcdf>
+            {% set agg_dim_name = subset|map("attr", "variables")|sum(start=[])|selectattr("name", "eq", a)|first|attr("dimensions")|selectattr("index", "eq", 0)|first|attr("scales")|first|attr('name') %}
+            {% set reference_attrs = subset|first|attr("variables")|selectattr("name", "eq", agg_dim_name)|first|attr("attrs")|attrs_dict %}
+            <aggregation type="joinExisting" dimName="{{ agg_dim_name }}">
+                {% for store in subset %}
+                {% set time = store.variables|selectattr("name", "eq", agg_dim_name)|first %}
+                {% set time_attrs = time.attrs|attrs_dict %}
+                <netcdf location="{{ store.name }}" ncoords="{{ store.variables|selectattr('name', 'eq', agg_dim_name)|first|attr('dimensions')|selectattr('index', 'eq', 0)|first|attr('size') }}">
+                    {% if time_attrs["units"] != reference_attrs["units"] or time_attrs["calendar"] != reference_attrs["calendar"] %}
+                    <variable name="{{ time.name }}">
+                        <attribute name="units" value="{{ time_attrs['units'] }}"/>
+                        <attribute name="calendar" value="{{ time_attrs['calendar'] }}"/>
+                        <values>{{ collector.read_variable(store.name, agg_dim_name)|convert_times(time_attrs["units"], time_attrs["calendar"], reference_attrs["units"], reference_attrs["calendar"])|list|map("string")|join(" ") }}</values>
+                    </variable>
+                    {% endif %}
+                </netcdf>
+            {% endfor %}
+            </aggregation>
+        </netcdf>
+        {% endif %}
+        {% endfor %}
+    </aggregation>
+</netcdf>

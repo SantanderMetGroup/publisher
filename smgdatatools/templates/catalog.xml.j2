@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<catalog name="{{ name }}"
+         xmlns="http://www.unidata.ucar.edu/namespaces/thredds/InvCatalog/v1.0"
+         xmlns:xlink="http://www.w3.org/1999/xlink">
+
+  <service name="all" serviceType="Compound" base="">
+    <service base="/thredds/fileServer/" name="http" serviceType="HTTPServer"/>
+    <service base="/thredds/dodsC/" name="odap" serviceType="OpenDAP"/>
+    <service base="/thredds/ncss/grid/" name="ncssGrid" serviceType="NetcdfSubset" />
+    <service base="/thredds/dap4/" name="dap4" serviceType="DAP4" />
+    <service base="/thredds/wcs/" name="wcs" serviceType="WCS" />
+    <service base="/thredds/wms/" name="wms" serviceType="WMS" />
+    <service base="/thredds/cdmremote/" name="cdmremote" serviceType="CdmRemote" />
+    <service base="/thredds/cdmrfeature/grid/" name="cdmrFeature" serviceType="CdmrFeature" />
+    <service base="/thredds/iso/" name="iso" serviceType="ISO" />
+    <service base="/thredds/ncml/" name="ncml" serviceType="NCML" />
+    <service base="/thredds/uddc/" name="uddc" serviceType="UDDC" />
+  </service>
+
+  <service name="virtual" serviceType="Compound" base="">
+    <service base="/thredds/dodsC/" name="odap" serviceType="OpenDAP"/>
+    <service base="/thredds/ncss/grid/" name="ncssGrid" serviceType="NetcdfSubset" />
+    <service base="/thredds/dap4/" name="dap4" serviceType="DAP4" />
+    <service base="/thredds/wcs/" name="wcs" serviceType="WCS" />
+    <service base="/thredds/wms/" name="wms" serviceType="WMS" />
+    <service base="/thredds/cdmremote/" name="cdmremote" serviceType="CdmRemote" />
+    <service base="/thredds/cdmrfeature/grid/" name="cdmrFeature" serviceType="CdmrFeature" />
+    <service base="/thredds/iso/" name="iso" serviceType="ISO" />
+    <service base="/thredds/ncml/" name="ncml" serviceType="NCML" />
+    <service base="/thredds/uddc/" name="uddc" serviceType="UDDC" />
+  </service>
+
+  {% for dataset in datasets %}
+  <dataset name="{{ dataset.path|basename|regex_replace('\.[^.]+', '') }}"
+           ID="{{ namespace }}/{{ dataset.drs['drs']|regex_replace('\.[^.]+', '') }}"
+           {% if restrict %}
+           restrictAccess="{{ restrict }}"
+           {% endif %}
+           urlPath="{{ namespace }}/{{ dataset.drs['drs']|regex_replace('\.[^.]+', '') }}">
+    <metadata inherited="true">
+      <serviceName>virtual</serviceName>
+      <dataSize units="bytes">{{ dataset.attrs["size"] }}</dataSize>
+      <date type="modified">{{ dataset.meta["last_modified"] }}</date>
+    </metadata>
+    <netcdf xmlns="http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2"
+            location="content/{{ namespace }}/{{ dataset.drs['drs'] }}" />
+  </dataset>
+
+  {% endfor %}
+</catalog>

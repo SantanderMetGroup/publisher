@@ -1,0 +1,68 @@
+{
+    ".zgroup": "{\n    \"zarr_format\": 2\n}",
+    ".zattrs": "{\"institution\":\"ECMWF\",\"source\":\"Reanalysis\",\"title\":\"ERA5 forecasts\"}",
+
+    {% set proto_store = stores[0] %}
+    {% set proto_stores = stores|map("attr", "variables")|sum(start=[])|selectattr("name", "eq", aggregations[0])|map("attr", "store")|list %}
+
+    {% for v in proto_store.variables %}
+    {% if v.name != "time0" and not v.name in aggregations %}
+    {% set shape = v.dimensions|map("attr", "size")|list %}
+    {% set chunks = v.dimensions|map("attr", "chunk_shapes")|sum(start=[])|sort(attribute="index")|map("attr", "shape")|list %}
+    {% set attributes = v.attrs|attrs_dict %}
+    {% set scales = ",".join(v.scales|map("attr", "name")|map("regex_replace", "^", "\\\"")|map("regex_replace", "$", "\\\"")) %}
+    "{{ v.name }}/.zarray": "{\"chunks\":{{ chunks }},\"compressor\":{\"id\":\"zlib\",\"level\":{{ v.chunks[0].compressor_level }}},\"dtype\":\"{{ v.dtype }}\",\"fill_value\":{{ v.fill_value|default("null", true) }},\"filters\":[{% for f in v.chunks[0].filters %}{\"elementsize\":{{ f.elementsize }},\"id\":\"{{ f.name }}\"}{% endfor %}],\"order\":\"C\",\"shape\":{{ shape }},\"zarr_format\":2}",
+    "{{ v.name }}/.zattrs": "{\"_ARRAY_DIMENSIONS\":[{{ scales }}],{{ attributes.items()|attrs_escape|join(", ") }}}",
+    {% endif %}
+    {% endfor %}
+
+    {% set v = proto_store.variables|selectattr("name", "eq", "time0")|first %}
+    {% set attributes = v.attrs %}
+    {% set aggsize = stores|map("attr", "variables")|sum(start=[])|selectattr("name", "eq", aggregations[0])|map("attr", "store")|map("attr", "variables")|sum(start=[])|selectattr("name", "eq", "time0")|map("attr", "dimensions")|sum(start=[])|map("attr", "size")|sum %}
+    {% set chunks = v.dimensions|map("attr", "chunk_shapes")|sum(start=[])|sort(attribute="index")|map("attr", "shape")|list %}
+    {% set attributes = v.attrs|attrs_dict %}
+    {% set scales = ",".join(v.scales|map("attr", "name")|map("regex_replace", "^", "\\\"")|map("regex_replace", "$", "\\\"")) %}
+    "{{ v.name }}/.zarray": "{\"chunks\":{{ chunks }},\"compressor\":{\"id\":\"zlib\",\"level\":{{ v.chunks[0].compressor_level }}},\"dtype\":\"{{ v.dtype }}\",\"fill_value\":{{ v.fill_value|default("null", true) }},\"filters\":[{% for f in v.chunks[0].filters %}{\"elementsize\":{{ f.elementsize }},\"id\":\"{{ f.name }}\"}{% endfor %}],\"order\":\"C\",\"shape\":[{{ aggsize }}],\"zarr_format\":2}",
+    "{{ v.name }}/.zattrs": "{\"_ARRAY_DIMENSIONS\":[{{ scales }}],{{ attributes.items()|attrs_escape|join(", ") }}}",
+
+    {% for a in aggregations %}
+    {% set v = stores|map("attr", "variables")|sum(start=[])|selectattr("name", "eq", a)|first %}
+    {% set aggsize = stores|map("attr", "variables")|sum(start=[])|selectattr("name", "eq", a)|map("attr", "dimensions")|sum(start=[])|selectattr("index", "eq", 0)|map("attr", "size")|sum %}
+    {% set shape = [aggsize] + (v.dimensions|map("attr", "size")|list)[1:] %}
+    {% set chunks = v.dimensions|map("attr", "chunk_shapes")|sum(start=[])|sort(attribute="index")|map("attr", "shape")|list %}
+    {% set attributes = v.attrs|attrs_dict %}
+    {% set scales = ",".join(v.scales|map("attr", "name")|map("regex_replace", "^", "\\\"")|map("regex_replace", "$", "\\\"")) %}
+    "{{ v.name }}/.zarray": "{\"chunks\":{{ chunks }},\"compressor\":{\"id\":\"zlib\",\"level\":{{ v.chunks[0].compressor_level }}},\"dtype\":\"{{ v.dtype }}\",\"fill_value\":{{ collector.read_attributes(v.store.name, v.name)["_FillValue"][0] }},\"filters\":[{% for f in v.chunks[0].filters %}{\"elementsize\":{{ f.elementsize }},\"id\":\"{{ f.name }}\"}{% endfor %}],\"order\":\"C\",\"shape\":{{ shape }},\"zarr_format\":2}",
+    "{{ v.name }}/.zattrs": "{\"_ARRAY_DIMENSIONS\":[{{ scales }}],{{ attributes.items()|attrs_escape|join(", ") }}}",
+    {% endfor %}
+
+    {% for v in proto_store.variables %}
+    {% if v.name != "time0" and not v.name in aggregations %}
+    {% for c in v.chunks %}
+    "{{ v.name }}/{{ c.index }}": [
+        "{{ proto_store.name|replace('https://s3.amazonaws.com/', '') }}", {{ c.location }}, {{ c.size }}
+    ],
+    {% endfor %}
+    {% endif %}
+    {% endfor %}
+
+    {% set time0 = proto_stores|map("attr", "variables")|sum(start=[])|selectattr("name", "eq", "time0")|join_existing %}
+    {% for v in time0 %}
+    {% for c in v.chunks %}
+    "time0/{{ c.index }}": [
+        "{{ v.store.name|replace('https://s3.amazonaws.com/', '') }}", {{ c.location }}, {{ c.size }}
+    ],
+    {% endfor %}
+    {% endfor %}
+
+    {% for a in aggregations %}
+    {% set agg = stores|map("attr", "variables")|sum(start=[])|selectattr("name", "eq", a)|list|join_existing %}
+    {% for v in agg %}
+    {% for c in v.chunks %}
+    "{{ v.name }}/{{ v|calculate_chunk_idx(c.index)|map("string")|join(".") }}": [
+        "{{ v.store.name|replace('https://s3.amazonaws.com/', '') }}", {{ c.location }}, {{ c.size }}
+    ],
+    {% endfor %}
+    {% endfor %}
+    {% endfor %}
+}
