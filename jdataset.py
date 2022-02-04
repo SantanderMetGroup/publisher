@@ -7,6 +7,7 @@ import cftime
 import numpy as np
 import pandas as pd
 from jinja2 import Environment, FileSystemLoader, ChoiceLoader, select_autoescape
+import netCDF4
 import traceback
 
 _help = '''Usage:
@@ -27,23 +28,22 @@ def f_values(series, sep=None):
 
     return series.apply(lambda a: sep.join(np.ravel(a).astype(str)))
 
-def f_timeunitschange(df, timecol=None, units=None, calendar=None):
-    if timecol is None:
-        timecol = 'time'
-    if units is None:
-        units = df[(timecol, 'units')].iloc[0]
-    if calendar is None:
-        calendar = df[(timecol, 'calendar')].iloc[0]
+def f_timeunitschange(times, frm_units, frm_calendar, to_units, to_calendar):
+    dates = cftime.num2date(times, frm_units, frm_calendar)
+    return cftime.date2num(dates, to_units, to_calendar)
 
-    df[(timecol, '_values')] = df.apply(lambda row:
-        cftime.num2date(row[(timecol, '_values')], row[(timecol, 'units')], row[(timecol, 'calendar')]), axis=1)
-    df[(timecol, '_values')] = df.apply(lambda row:
-        cftime.date2num(row[(timecol, '_values')], units, calendar), axis=1)
+def f_ncattrs(filename, variable):
+    with netCDF4.Dataset(filename, "r") as ds:
+        attrs = {k: ds.variables[variable].getncattr(k) for k in ds.variables[variable].ncattrs()}
 
-#    df[(timecol, 'units')] = units
-#    df[(timecol, 'calendar')] = calendar
+    return attrs
 
-    return df
+def f_attrs(filename, variable):
+    subset = df[(df["filename"] == filename) & (df["variable"] == variable) & (df["attr"].notnull())][["attr", "attr_value"]]
+    return dict(zip(subset["attr"], subset["attr_value"]))
+
+def f_dimsize(df, filename, dim):
+    return df[(df["filename"] == filename) & (df["dimension"] == dim) & (df["variable"].isna())]["dimension_size"].iloc[0]
 
 # non filter functions
 def setup_jinja(templates):
@@ -66,6 +66,9 @@ def setup_jinja(templates):
 
     env.filters['_values'] = f_values
     env.filters['timeunitschange'] = f_timeunitschange
+    env.filters['attrs'] = f_attrs
+    env.filters['ncattrs'] = f_ncattrs
+    env.filters['dimsize'] = f_dimsize
 
     env.tests['isncml'] = lambda dataset: dataset['ext'] == ".ncml"
     env.tests['isnc'] = lambda dataset: dataset['ext'] != ".ncml"
@@ -75,8 +78,9 @@ def setup_jinja(templates):
 
 def render(df, dest, **kwargs):
     try:
-        d = dict(df['GLOBALS'].iloc[0])
-        path = os.path.abspath(args['dest'].format(**d))
+        facets = df[~df["facet"].isna()][["facet", "facet_value"]].drop_duplicates("facet")
+        facets = dict(zip(facets["facet"], facets["facet_value"]))
+        path = os.path.abspath(args['dest'].format(**facets))
 
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, 'w+') as fh:

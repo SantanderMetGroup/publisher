@@ -1,26 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
+{% set variables = (df[df["facet"] == variable_facet]["facet_value"].dropna().unique())|sort %} 
 <netcdf xmlns="http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2">
-  <attribute name="primary_variables" value="{{ ','.join(df[('GLOBALS', variable_col)].unique()) }}"/>
-  <attribute name="size" type="int" value="{{ df[('GLOBALS', 'size')].sum()|int }}" />
-  <attribute name="size_human" value="{{ df[('GLOBALS', 'size')].sum()|filesizeformat(binary=True) }}" />
+  <attribute name="primary_variables" value="{{ variables|join(",") }}"/>
+  <attribute name="size" type="int" value="{{ df[df["attr"] == "size"]["attr_value"].sum()|int }}" />
+  <attribute name="size_human" value="{{ df[df["attr"] == "size"]["attr_value"].sum()|int|filesizeformat(binary=True) }}" />
 
   <aggregation type="union">
-    {% for variable,variable_group in df.sort_values(by=[('GLOBALS', variable_col), ('GLOBALS', 'localpath')]).groupby(('GLOBALS', variable_col)) %}
+    {% for variable,variable_group in df[df["facet"] == variable_facet].sort_values(["facet_value", "filename"]).groupby("facet_value") %}
     <netcdf>
         <aggregation type="joinExisting" dimName="time_{{ variable }}">
             {% for rowindex,rowdata in variable_group.iterrows() %}
-            <netcdf location="{{ rowdata[('GLOBALS', 'localpath')].strip('\n') }}" ncoords="{{ rowdata[('_d_time', 'size')] }}">
-                <dimension name="time_{{ variable }}" orgName="time" isUnlimited="false"/>
-                <variable name="time_{{ variable }}" orgName="time"/>
-                {% if ('height', 'standard_name') in rowdata.index and rowdata[('height', 'standard_name')] == 'height' %}
-                <!-- height is variable dependent -->
-                <variable name="height_{{ variable }}" orgName="height"/>
+            <netcdf location="{{ rowdata["filename"] }}" ncoords="{{ df|dimsize(rowdata["filename"], "time")|int }}">
+              {% set attrs = rowdata["filename"]|ncattrs(variable) %}
+              <dimension name="time_{{ variable }}" orgName="time" isUnlimited="false"/>
+              <variable name="time_{{ variable }}" orgName="time"/>
+              {% if "coordinates" in attrs and "height" in attrs["coordinates"] %}
+              <!-- height is variable dependent -->
+              <variable name="height_{{ variable }}" orgName="height"/>
+              {% endif %}
+              <variable name="{{ variable }}">
+                {% if "coordinates" in attrs and "height" in attrs["coordinates"] %}
+                <attribute name="coordinates" value="{{ attrs["coordinates"]|replace("height", "height_" + variable) }}" />
                 {% endif %}
-                <variable name="{{ variable }}" shape="time_{{ variable }} {{ (rowdata[(variable, '_dimensions')].split(',')[-2:])|join(' ') }}">
-                    {% if (variable, 'coordinates') in  rowdata.index %}
-                    <attribute name="coordinates" value="{{ rowdata[(variable, 'coordinates')]|replace('time', '_'.join(['time', variable]))|replace('height', '_'.join(['height', variable])) }}"/>
-                    {% endif %}
-                </variable>
+              </variable>
             </netcdf>
             {% endfor %}
         </aggregation>
