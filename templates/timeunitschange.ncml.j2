@@ -6,11 +6,11 @@
     {% for variable,variable_group in df[df["facet"] == variable_facet].sort_values(["facet_value", "filename"]).groupby("facet_value") %}
     <netcdf>
         <aggregation type="joinExisting" dimName="time_{{ variable }}">
-            {% set time_reference_attrs = (variable_group["filename"].dropna().iloc[0])|attrs("time") %}
+            {% set time_reference_attrs = df|attrs(variable_group["filename"].dropna().iloc[0], "time") %}
             {% for rowindex,rowdata in variable_group.iterrows() %}
             <netcdf location="{{ rowdata["filename"] }}" ncoords="{{ df|dimsize(rowdata["filename"], "time")|int }}">
-                {% set variable_attrs = rowdata["filename"]|attrs(variable) %}
-                {% set time_attrs = rowdata["filename"]|attrs("time") %}
+                {% set variable_attrs = df|attrs(rowdata["filename"], variable) %}
+                {% set time_attrs = df|attrs(rowdata["filename"], "time") %}
                 <dimension name="time_{{ variable }}" orgName="time" isUnlimited="false"/>
                 <variable name="time_{{ variable }}" orgName="time">
                     <attribute name="units" value="{{ time_attrs["units"] }}"/>

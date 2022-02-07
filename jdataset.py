@@ -38,7 +38,7 @@ def f_ncattrs(filename, variable):
 
     return attrs
 
-def f_attrs(filename, variable):
+def f_attrs(df, filename, variable):
     subset = df[(df["filename"] == filename) & (df["variable"] == variable) & (df["attr"].notnull())][["attr", "attr_value"]]
     return dict(zip(subset["attr"], subset["attr_value"]))
 
