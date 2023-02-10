@@ -22,6 +22,7 @@ setup(name='smgdatatools',
           'sqlalchemy',
           'gcsfs',
           'requests',
+          'natsort',
       ],
       scripts=[
           'smgdatatools/esgfsearch.py',
