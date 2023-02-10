@@ -174,7 +174,7 @@ class Aria2cFormatter(Formatter):
                 "urls": urls,
                 "checksum": checksum,
                 "checksum_type": checksum_type,
-                "out": instance_id.rstrip(".nc").replace(".", "/") + ".nc"
+                "out": re.sub(r"\.nc$", "", instance_id).replace(".", "/") + ".nc"
             }
 
     def terminate(self):

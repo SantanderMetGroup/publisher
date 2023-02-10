@@ -246,16 +246,16 @@ class TestEsgfVds(unittest.TestCase):
     def test_cmip6_new_common_vds_year2300(self):
         datasets = [
             # r1i1p1f1, tas and pr, 1850-1869 and 1870-1889
-            "data/dates-2023/pr_Amon_ACCESS-ESM1-5_ssp585_r1i1p1f1_gn_201501-210012.nc",
-            "data/dates-2023/pr_Amon_ACCESS-ESM1-5_ssp585_r1i1p1f1_gn_210101-230012.nc",
-            "data/dates-2023/tas_Amon_ACCESS-ESM1-5_ssp585_r1i1p1f1_gn_201501-210012.nc",
-            "data/dates-2023/tas_Amon_ACCESS-ESM1-5_ssp585_r1i1p1f1_gn_210101-230012.nc",
+            "data/pr_Amon_ACCESS-ESM1-5_ssp585_r1i1p1f1_gn_201501-210012.nc",
+            "data/pr_Amon_ACCESS-ESM1-5_ssp585_r1i1p1f1_gn_210101-230012.nc",
+            "data/tas_Amon_ACCESS-ESM1-5_ssp585_r1i1p1f1_gn_201501-210012.nc",
+            "data/tas_Amon_ACCESS-ESM1-5_ssp585_r1i1p1f1_gn_210101-230012.nc",
 
             # r2i1p1f1, tas and pr, 1850-1869 and 1870-1889
-            "data/dates-2023/pr_Amon_ACCESS-ESM1-5_ssp585_r2i1p1f1_gn_201501-210012.nc",
-            "data/dates-2023/pr_Amon_ACCESS-ESM1-5_ssp585_r2i1p1f1_gn_210101-230012.nc",
-            "data/dates-2023/tas_Amon_ACCESS-ESM1-5_ssp585_r2i1p1f1_gn_201501-210012.nc",
-            "data/dates-2023/tas_Amon_ACCESS-ESM1-5_ssp585_r2i1p1f1_gn_210101-230012.nc",
+            "data/pr_Amon_ACCESS-ESM1-5_ssp585_r2i1p1f1_gn_201501-210012.nc",
+            "data/pr_Amon_ACCESS-ESM1-5_ssp585_r2i1p1f1_gn_210101-230012.nc",
+            "data/tas_Amon_ACCESS-ESM1-5_ssp585_r2i1p1f1_gn_201501-210012.nc",
+            "data/tas_Amon_ACCESS-ESM1-5_ssp585_r2i1p1f1_gn_210101-230012.nc",
         ]
 
         collector = NcCollector()
@@ -279,14 +279,14 @@ class TestEsgfVds(unittest.TestCase):
         for vl in vld:
             for interval in intervald:
                 with netCDF4.Dataset(
-                        f"data/dates-2023/tas_Amon_ACCESS-ESM1-5_ssp585_{vl}_gn_{interval[0]}-{interval[1]}.nc") as reference:
+                        f"data/tas_Amon_ACCESS-ESM1-5_ssp585_{vl}_gn_{interval[0]}-{interval[1]}.nc") as reference:
                     reference_mean = reference.variables["tas"][:].mean()
                     test_mean = ds.variables["tas"][vld[vl], intervald[interval][0]:intervald[interval][1], :, :].mean()
 
                     self.assertEqual(reference_mean, test_mean)
 
                 with netCDF4.Dataset(
-                        f"data/dates-2023/pr_Amon_ACCESS-ESM1-5_ssp585_{vl}_gn_{interval[0]}-{interval[1]}.nc") as reference:
+                        f"data/pr_Amon_ACCESS-ESM1-5_ssp585_{vl}_gn_{interval[0]}-{interval[1]}.nc") as reference:
                     reference_mean = reference.variables["pr"][:].mean()
                     test_mean = ds.variables["pr"][vld[vl], intervald[interval][0]:intervald[interval][1], :, :].mean()
 
