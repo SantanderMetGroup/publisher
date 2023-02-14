@@ -61,7 +61,7 @@ class JinjaEtl(Etl):
 
         env.filters["regex_replace"] = lambda s, find, replace: re.sub(find, replace, s)
         env.filters["attrs_dict"] = lambda attrs: {attr.name: attr.value for attr in attrs}
-        env.filters["attrs_escape"] = lambda dict_items: {"\\\"{}\\\": \\\"{}\\\"".format(x[0], x[1].replace("\"", ""))
+        env.filters["attrs_escape"] = lambda dict_items: {"\\\"{}\\\":\\\"{}\\\"".format(x[0], x[1].replace("\"", ""))
                                                           for x in dict_items}
         env.filters["join_existing"] = join_existing
         env.filters["calculate_chunk_idx"] = calculate_chunk_idx

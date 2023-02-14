@@ -72,13 +72,15 @@ class Hdf5ChunkCollector(Collector):
             variable = Variable(
                 name=v,
                 dtype=f[v].dtype.str,
-                fillvalue=f[v].fillvalue,
+                fillvalue=f[v].fillvalue or None,
                 store_id=store.id)
 
             # compressor
             if f[v].compression:
-                comp = Compressor(
-                    name=f[v].compression)
+                comp = Compressor()
+                comp.properties.append(CompressorProperty(
+                    name="id",
+                    value=f[v].compression))
                 comp.properties.append(CompressorProperty(
                     name="level",
                     value=f[v].compression_opts))
@@ -86,18 +88,20 @@ class Hdf5ChunkCollector(Collector):
 
             # filters
             if f[v].shuffle:
-                filt = Filter(
-                    name="shuffle",
-                    variable_id=variable.id)
+                filt = Filter(variable_id=variable.id)
+                filt.properties.append(FilterProperty(
+                    name="id",
+                    value="shuffle"))
                 for x in ["elementsize"]:
                     filt.properties.append(FilterProperty(
                         name=x,
                         value=f[v].dtype.itemsize))
                 variable.filters.append(filt)
             if f[v].fletcher32:
-                filt = Filter(
-                    name="fletcher32",
-                    variable_id=variable.id)
+                filt = Filter(variable_id=variable.id)
+                filt.properties.append(FilterProperty(
+                    name="id",
+                    value="fletcher32"))
                 for x in ["elementsize"]:
                     filt.properties.append(FilterProperty(
                         name=x,
