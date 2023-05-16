@@ -87,9 +87,9 @@ def range_search(endpoint, session, query, stop=None):
                 break
 
 
-def standard_search(query, stop):
+def standard_search(query, stop, index):
     s = requests.Session()
-    endpoint = "https://{}/esg-search/search".format(INDEX_NODES[0])
+    endpoint = "https://{}/esg-search/search".format(index)
     for result in range_search(endpoint, s, query, stop):
         yield result
     s.close()
@@ -319,6 +319,11 @@ if __name__ == "__main__":
                         nargs="?",
                         default=None,
                         help="use an existing input file.")
+    parser.add_argument("-i", "--index-node",
+                        type=str,
+                        nargs="?",
+                        default="esgf-node.llnl.gov",
+                        help="domain of the index node to query.")
     parser.add_argument("-q", "--query",
                         type=str,
                         nargs="?",
@@ -376,7 +381,7 @@ if __name__ == "__main__":
             for result in nondistrib_search(parse_query(args["query"]), args["stop"]):
                 formatter.dump(fix_result(result))
         else:
-            for result in standard_search(parse_query(args["query"]), args["stop"]):
+            for result in standard_search(parse_query(args["query"]), args["stop"], args["index_node"]):
                 formatter.dump(fix_result(result))
 
     # search selections
@@ -386,7 +391,7 @@ if __name__ == "__main__":
                 for result in nondistrib_search(query, args["stop"]):
                     formatter.dump(fix_result(result))
             else:
-                for result in standard_search(query, args["stop"]):
+                for result in standard_search(query, args["stop"], args["index_node"]):
                     formatter.dump(fix_result(result))
 
     # for formatters that store in memory
