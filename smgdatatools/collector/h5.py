@@ -44,11 +44,11 @@ class Hdf5ChunkCollector(Collector):
 
         return attrs
 
-    def collect(self, store):
-        f = h5py.File(store, driver=self.driver)
+    def collect(self, resource):
+        f = h5py.File(resource, driver=self.driver)
 
-        logging.warning("Collecting from {}".format(store))
-        store = Store(name=store, size=0)
+        logging.warning("Collecting from {}".format(resource))
+        store = Store(name=resource, size=0)
 
         # global attrs
         attrs = dict(f.attrs)
