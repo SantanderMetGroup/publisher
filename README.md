@@ -154,3 +154,14 @@ test/data/tas_Amon_ACCESS-ESM1-5_ssp585_r2i1p1f1_gn_210101-230012.nc' | etl.py -
 ```
 
 Open the generated XML file with your favourite editor. You may also use [ToolsUI](https://docs.unidata.ucar.edu/netcdf-java/current/userguide/toolsui_ref.html) or [climate4R](https://github.com/SantanderMetGroup/climate4R).
+
+#### CMIP6 DCCP
+
+DCCP from CMIP6 is a [FMRC](https://docs.unidata.ucar.edu/netcdf-java/5.4/userguide/fmrc_ref.html).
+
+```bash
+echo 'test/data/psl_6hrPlevPt_MIROC6_dcppA-hindcast_s2009-r1i1p1f1_gn_200911010600-201001010000.nc
+test/data/psl_6hrPlevPt_MIROC6_dcppA-hindcast_s2009-r2i1p1f1_gn_200911010600-201001010000.nc
+test/data/psl_6hrPlevPt_MIROC6_dcppA-hindcast_s2010-r1i1p1f1_gn_201011010600-201101010000.nc
+test/data/psl_6hrPlevPt_MIROC6_dcppA-hindcast_s2010-r2i1p1f1_gn_201011010600-201101010000.nc' | etl.py --etl jinja --template smgdatatools/templates/cmip6-dccp.ncml.j2 --collector nc --dest test.ncml --aggregations psl --drs '.*s(?P<subexperiment>[0-9]{4})-.*'
+```
